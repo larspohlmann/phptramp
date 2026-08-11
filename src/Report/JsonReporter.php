@@ -58,7 +58,7 @@ final class JsonReporter implements Reporter
     {
         return [
             'param' => $finding->param,
-            'severity' => $this->severityLabel($severity),
+            'severity' => $severity->label(),
             'origin' => $finding->origin,
             'terminal' => $finding->terminal,
             'terminalKind' => $finding->terminalKind->value,
@@ -67,14 +67,6 @@ final class JsonReporter implements Reporter
             'chain' => $this->chainDocument($finding),
             'notes' => $finding->notes,
         ];
-    }
-
-    private function severityLabel(Severity $severity): string
-    {
-        return match ($severity) {
-            Severity::Error => 'error',
-            Severity::Warning => 'warning',
-        };
     }
 
     /**

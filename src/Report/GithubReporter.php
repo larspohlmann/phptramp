@@ -66,7 +66,7 @@ final class GithubReporter implements Reporter
         $origin = $finding->chain[0];
         $title = 'phptramp::' . $this->message->describe($finding);
 
-        return '::' . $this->command($severity)
+        return '::' . $severity->label()
             . ' file=' . $this->escape($this->paths->relativize($origin->file))
             . ',line=' . $origin->line
             . ',title=' . $this->escape($title);
@@ -94,14 +94,6 @@ final class GithubReporter implements Reporter
         }
 
         return $hops;
-    }
-
-    private function command(Severity $severity): string
-    {
-        return match ($severity) {
-            Severity::Error => 'error',
-            Severity::Warning => 'warning',
-        };
     }
 
     private function escape(string $value): string

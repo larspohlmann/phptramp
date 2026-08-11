@@ -58,7 +58,7 @@ final class CheckstyleReporter implements Reporter
     {
         $origin = $finding->chain[0];
 
-        return '    <error line="' . $origin->line . '" severity="' . $this->severityLabel($severity)
+        return '    <error line="' . $origin->line . '" severity="' . $severity->label()
             . '" message="' . $this->escape($this->message->describe($finding))
             . '" source="phptramp.trampData"/>';
     }
@@ -83,14 +83,6 @@ final class CheckstyleReporter implements Reporter
         }
 
         return $groups;
-    }
-
-    private function severityLabel(Severity $severity): string
-    {
-        return match ($severity) {
-            Severity::Error => 'error',
-            Severity::Warning => 'warning',
-        };
     }
 
     private function escape(string $value): string

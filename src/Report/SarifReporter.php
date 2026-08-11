@@ -87,7 +87,7 @@ final class SarifReporter implements Reporter
     {
         $result = [
             'ruleId' => 'phptramp.trampData',
-            'level' => $this->levelLabel($severity),
+            'level' => $severity->label(),
             'message' => ['text' => $this->message->describe($finding)],
             'locations' => [$this->location($finding->chain[0])],
         ];
@@ -131,14 +131,6 @@ final class SarifReporter implements Reporter
                 'region' => ['startLine' => $hop->line],
             ],
         ];
-    }
-
-    private function levelLabel(Severity $severity): string
-    {
-        return match ($severity) {
-            Severity::Error => 'error',
-            Severity::Warning => 'warning',
-        };
     }
 
     /**

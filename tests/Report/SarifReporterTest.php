@@ -195,6 +195,73 @@ final class SarifReporterTest extends TestCase
         self::assertStringNotContainsString('"ruleId"', $reporter->render([$finding]));
     }
 
+    /**
+     * Findings are not sorted by hop count, so a below-threshold finding can
+     * precede an above-threshold one in real input order. This pins that the
+     * per-finding `continue` (skip this finding, keep scanning) is not a
+     * `break` in disguise (stop scanning entirely) — a `break` here would
+     * silently drop every qualifying finding that comes after the first
+     * skipped one.
+     */
+    public function testStillIncludesQualifyingFindingAfterAnEarlierBelowThresholdFindingIsSkipped(): void
+    {
+        $belowChain = [
+            new Hop('Demo\Z::go', 'Demo\Z', 'src/Z.php', 1, null),
+        ];
+        $belowFinding = new Finding('z', 'Demo\Z::go', 'Demo\Z::go', TerminalKind::Used, 1, $belowChain, 1, [], []);
+
+        $aboveChain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\B::step', 'Demo\B', 'src/B.php', 9, 11),
+            new Hop('Demo\C::sink', 'Demo\C', 'src/C.php', 13, null),
+        ];
+        $aboveFinding = new Finding('p', 'Demo\A::go', 'Demo\C::sink', TerminalKind::Used, 2, $aboveChain, 2, [], []);
+
+        $reporter = new SarifReporter(new Thresholds(3, 2), $this->paths());
+
+        $document = json_decode($reporter->render([$belowFinding, $aboveFinding]), true);
+        $results = $document['runs'][0]['results'];
+
+        self::assertCount(1, $results);
+        self::assertSame('warning', $results[0]['level']);
+        self::assertSame(
+            '$p: 2 pass-through hops across 2 classes (terminal: Demo\C::sink [used])',
+            $results[0]['message']['text'],
+        );
+    }
+
+    public function testIncludesBothResultsWhenMultipleFindingsQualify(): void
+    {
+        $firstChain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\A::sink', 'Demo\A', 'src/A.php', 9, null),
+        ];
+        $firstFinding = new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, 1, $firstChain, 1, [], []);
+
+        $secondChain = [
+            new Hop('Demo\B::go', 'Demo\B', 'src/B.php', 5, 7),
+            new Hop('Demo\B::sink', 'Demo\B', 'src/B.php', 9, null),
+        ];
+        $secondFinding = new Finding('q', 'Demo\B::go', 'Demo\B::sink', TerminalKind::Used, 1, $secondChain, 1, [], []);
+
+        $reporter = new SarifReporter(new Thresholds(1, null), $this->paths());
+
+        $document = json_decode($reporter->render([$firstFinding, $secondFinding]), true);
+        $results = $document['runs'][0]['results'];
+
+        self::assertCount(2, $results);
+        self::assertSame('phptramp.trampData', $results[0]['ruleId']);
+        self::assertSame('phptramp.trampData', $results[1]['ruleId']);
+        self::assertSame(
+            '$p: 1 pass-through hop across 1 class (terminal: Demo\A::sink [used])',
+            $results[0]['message']['text'],
+        );
+        self::assertSame(
+            '$q: 1 pass-through hop across 1 class (terminal: Demo\B::sink [used])',
+            $results[1]['message']['text'],
+        );
+    }
+
     public function testEmptyRunRendersValidDocumentWithEmptyResults(): void
     {
         $expected = <<<JSON
