@@ -105,13 +105,13 @@ enum ClassKind
 `$name`). `IndexingVisitor::recordClass()` maps the node type; `Class_` checks
 `$node->isAbstract()`.
 
-- [ ] **Step 1:** extend `IndexerTest` with one test: index a code string containing
+- [x] **Step 1:** extend `IndexerTest` with one test: index a code string containing
   a concrete class, an abstract class, an interface, a trait, and an enum; assert
   `classInfo(...)->kind` for all five.
-- [ ] **Step 2:** run → red (enum missing).
-- [ ] **Step 3:** implement; fix the two `ClassInfo` construction sites.
-- [ ] **Step 4:** green; `composer check` green.
-- [ ] **Step 5:** commit `feat(#3): record class kind in the index`.
+- [x] **Step 2:** run → red (enum missing).
+- [x] **Step 3:** implement; fix the two `ClassInfo` construction sites.
+- [x] **Step 4:** green; `composer check` green.
+- [x] **Step 5:** commit `feat(#3): record class kind in the index`.
 
 ### Task 2: `ClassHierarchy`
 
@@ -143,14 +143,14 @@ final class ClassHierarchy
 Cycle guard: parent/interface walks carry a visited set — malformed input code must
 not hang the analyzer.
 
-- [ ] **Step 1:** failing tests, built on the temp-file Indexer helper:
+- [x] **Step 1:** failing tests, built on the temp-file Indexer helper:
   method found directly; via trait `use`; via parent; via grandparent; trait beats
   parent (PHP semantics); unknown class → null. `implementationsOf`: interface with
   one concrete impl; with two (sorted); via `extends` chain of interfaces; via
   abstract base; abstract class itself never listed; unknown name → `[]`.
   `isAbstractType` for all five kinds.
-- [ ] **Step 2:** red. **Step 3:** implement. **Step 4:** green + check.
-- [ ] **Step 5:** commit `feat(#3): class hierarchy with trait flattening and implementation lookup`.
+- [x] **Step 2:** red. **Step 3:** implement. **Step 4:** green + check.
+- [x] **Step 5:** commit `feat(#3): class hierarchy with trait flattening and implementation lookup`.
 
 ### Task 3: `Resolution` + `ReceiverTyper` + `CallResolver`
 
@@ -222,7 +222,7 @@ bindings to Phase 1 reality:
   position, where positions ≥ the variadic collector's position bind to the variadic
   param. No match → `TruncatedResolution('argument does not bind to a parameter')`.
 
-- [ ] **Step 1:** failing tests (temp-file Indexer helper; one test per rule):
+- [x] **Step 1:** failing tests (temp-file Indexer helper; one test per rule):
   function in index; `sprintf` → External; static via class name; static inherited
   from parent; `$this->m()`; method via param declared type; via inline-new receiver
   (Phase 1 emits the inferred FQCN hint); interface single impl → that impl;
@@ -231,9 +231,9 @@ bindings to Phase 1 reality:
   `new X($p)` with constructor; `new X($p)` without constructor → External;
   named-arg binding (`argKey 'cfg'` → param `cfg`); positional past variadic binds
   to variadic; positional arg beyond the last param → Truncated.
-- [ ] **Step 2:** red. **Step 3:** implement (`CallResolver` dispatches per kind;
+- [x] **Step 2:** red. **Step 3:** implement (`CallResolver` dispatches per kind;
   `ReceiverTyper` owns hint→FQCN; both stay PHPMD-clean — extract, don't nest).
-- [ ] **Step 4:** green + check. **Step 5:** commit `feat(#3): call resolver`.
+- [x] **Step 4:** green + check. **Step 5:** commit `feat(#3): call resolver`.
 
 ### Task 4: `storedOnly` on `ParamInfo`
 
@@ -245,11 +245,11 @@ classifier fact: fate is `Used` *and* every use is a property assignment
 `public readonly bool $storedOnly = false` as last constructor arg),
 `src/Index/UsageClassifier.php`; test `tests/Index/UsageClassifierTest.php`.
 
-- [ ] **Step 1:** failing tests: `$this->x = $p;` → `Used` + `storedOnly` true;
+- [x] **Step 1:** failing tests: `$this->x = $p;` → `Used` + `storedOnly` true;
   promoted `private Cfg $p` → true; `$this->x = $p; log($p->env);` → false;
   `other($p);` (PureForward) → false; plain `log($p);` → false.
-- [ ] **Step 2:** red. **Step 3:** implement. **Step 4:** green + check.
-- [ ] **Step 5:** commit `feat(#3): classify stores-only parameter usage`.
+- [x] **Step 2:** red. **Step 3:** implement. **Step 4:** green + check.
+- [x] **Step 5:** commit `feat(#3): classify stores-only parameter usage`.
 
 ### Task 5: `Chain/` value objects + `ChainBuilder`
 
@@ -330,7 +330,7 @@ Bindings and determinism decisions:
   `"<callerFqmn>: <kind>:<name> -> <targetFqmn>"` (or `-> external: <detail>` /
   `-> truncated: <reason>`).
 
-- [ ] **Step 1:** failing tests (temp-file helper; assert against `Finding` fields):
+- [x] **Step 1:** failing tests (temp-file helper; assert against `Finding` fields):
   the 3-hop README chain (origin/terminal/hops=3/classes=4/`Stored`); use at hop 2
   splits the chain (finding of 1 hop ending `Used`); branch to two callees → two
   findings sharing the origin; by-ref callee → `ByRef`; callee never touching the
@@ -339,10 +339,10 @@ Bindings and determinism decisions:
   `(recursive)` note, terminates; entry-less cycle (a↔b, no other caller) → still
   reported once with `(recursive)`; hops ≥ limit is NOT applied here (a 1-hop chain
   is returned).
-- [ ] **Step 2:** red. **Step 3:** implement (DFS with the current path as visited
+- [x] **Step 2:** red. **Step 3:** implement (DFS with the current path as visited
   set; keep it PHPMD-clean — the walk, terminal mapping, and finding assembly are
   separate methods or a small helper class).
-- [ ] **Step 4:** green + check. **Step 5:** commit `feat(#3): chain builder`.
+- [x] **Step 4:** green + check. **Step 5:** commit `feat(#3): chain builder`.
 
 ### Task 6: `TextReporter`, default pipeline, exit codes
 
@@ -375,12 +375,12 @@ FileLocator → Indexer → ClassHierarchy/CallResolver → ChainBuilder, filter
 Phase 1 "not implemented" branch dies. Formats other than `text` return exit 2 with
 `format not implemented until Phase 3`.
 
-- [ ] **Step 1:** failing reporter test (exact-string, both finding shapes and the
+- [x] **Step 1:** failing reporter test (exact-string, both finding shapes and the
   empty case) + Application tests: 3-hop fixture code → exit 1 and output contains
   `FINDING`; same code with `--limit 4` → exit 0 and `No tramp data found`;
   `--format json` → exit 2.
-- [ ] **Step 2:** red. **Step 3:** implement. **Step 4:** green + check.
-- [ ] **Step 5:** commit `feat(#3): text reporter, default pipeline, exit codes`.
+- [x] **Step 2:** red. **Step 3:** implement. **Step 4:** green + check.
+- [x] **Step 5:** commit `feat(#3): text reporter, default pipeline, exit codes`.
 
 ### Task 7: `--explain`
 
@@ -390,7 +390,7 @@ tests extend `tests/Report/TextReporterTest.php`.
 With `Options->explain`, each finding is followed by its `trace` lines indented
 under an `explain:` header; without the flag, output is unchanged (pin both).
 
-- [ ] Steps: failing test → red → implement → green + check →
+- [x] Steps: failing test → red → implement → green + check →
   commit `feat(#3): --explain resolution traces`.
 
 ### Task 8: End-to-end fixtures, harness extension, dogfood
@@ -433,7 +433,7 @@ the codebase is chain-clean, then Phase 6 lowers it to a real gate. Update
 `README.md` status ("Phase 2: chain reporting works") and check off Phase 2 in
 `docs/plan.md`.
 
-- [ ] Steps: harness extension test-first (red on the first new fixture) → fixtures
+- [x] Steps: harness extension test-first (red on the first new fixture) → fixtures
   one by one → green + check → commit `test(#3): end-to-end chain fixtures` →
   CI/docs edits → commit `ci(#3): dogfood phptramp on itself (report-only)`.
 

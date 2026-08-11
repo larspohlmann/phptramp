@@ -20,6 +20,8 @@ final class ParamInfo
         public readonly bool $byRef,
         public readonly bool $variadic,
         public readonly ?string $type,
+        /** Fate is Used and every use is a `$this->prop = $p` store (or promoted). */
+        public readonly bool $storedOnly = false,
     ) {
     }
 }

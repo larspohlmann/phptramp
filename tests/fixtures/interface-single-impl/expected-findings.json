@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "config",
+            "origin": "Demo\\Controller::run",
+            "terminal": "Demo\\RealHandler::handle",
+            "terminalKind": "used",
+            "hops": 1,
+            "chain": ["Demo\\Controller::run", "Demo\\RealHandler::handle"],
+            "classes": 2,
+            "notes": []
+        }
+    ]
+}

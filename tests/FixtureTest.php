@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 namespace PhpTramp\Tests;
 
+use PhpTramp\Chain\ChainBuilder;
+use PhpTramp\Chain\Finding;
+use PhpTramp\Chain\Hop;
 use PhpTramp\Console\Application;
+use PhpTramp\Console\Options;
+use PhpTramp\Discovery\FileLocator;
+use PhpTramp\Index\Indexer;
+use PhpTramp\Resolve\CallResolver;
+use PhpTramp\Resolve\ClassHierarchy;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Fixture harness: runs the real CLI pipeline over every
- * tests/fixtures/<case>/src and compares its normalized `--dump-index` output
- * against the case's expected-index.json. Adding a semantic rule means adding a
- * fixture directory, not touching this test.
+ * Fixture harness: runs the real pipeline over every tests/fixtures/<case>/src.
+ * A case with expected-index.json pins the classifier's `--dump-index` output; a
+ * case with expected-findings.json pins the chain builder's findings (chain
+ * flattened to FQMNs — the CLI JSON format arrives in Phase 3). Adding a semantic
+ * rule means adding a fixture directory, not touching this test.
  */
 final class FixtureTest extends TestCase
 {
@@ -41,6 +50,58 @@ final class FixtureTest extends TestCase
         $actual = $this->normalize($this->dumpIndex($caseDir . '/src'), $real);
 
         self::assertEquals($expected, $actual);
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function findingsFixtureProvider(): iterable
+    {
+        $pattern = __DIR__ . '/fixtures/*/expected-findings.json';
+        foreach (glob($pattern) ?: [] as $expectedFile) {
+            $caseDir = dirname($expectedFile);
+            yield basename($caseDir) => [$caseDir];
+        }
+    }
+
+    #[DataProvider('findingsFixtureProvider')]
+    public function testFindingsMatchExpectation(string $caseDir): void
+    {
+        $expectedJson = file_get_contents($caseDir . '/expected-findings.json');
+        self::assertIsString($expectedJson);
+        $expected = json_decode($expectedJson, true);
+
+        self::assertEquals($expected, $this->findings($caseDir . '/src'));
+    }
+
+    /**
+     * @return array{findings: list<array<string, mixed>>}
+     */
+    private function findings(string $srcDir): array
+    {
+        $files = (new FileLocator())->locate(new Options(folders: [$srcDir]));
+        $index = (new Indexer())->index($files);
+        $resolver = new CallResolver($index, new ClassHierarchy($index));
+        $findings = (new ChainBuilder($resolver))->build($index);
+
+        return ['findings' => array_map($this->normalizeFinding(...), $findings)];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeFinding(Finding $finding): array
+    {
+        return [
+            'param' => $finding->param,
+            'origin' => $finding->origin,
+            'terminal' => $finding->terminal,
+            'terminalKind' => $finding->terminalKind->value,
+            'hops' => $finding->hops,
+            'chain' => array_map(static fn (Hop $hop): string => $hop->fqmn, $finding->chain),
+            'classes' => $finding->classes,
+            'notes' => $finding->notes,
+        ];
     }
 
     /**

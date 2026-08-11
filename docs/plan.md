@@ -607,7 +607,7 @@ class Mailer
 
 ---
 
-## Phase 2 — Chain stitching → *usable tool*  (in progress — issue #3)
+## Phase 2 — Chain stitching → *usable tool*  ✅ (issue #3)
 
 **Deliverable:** `phptramp --folder src --limit 3` prints text findings, exits 0/1/2.
 

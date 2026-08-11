@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "config",
+            "origin": "Demo\\Controller::handle",
+            "terminal": "Demo\\Service::process",
+            "terminalKind": "used",
+            "hops": 1,
+            "chain": ["Demo\\Controller::handle", "Demo\\Service::process"],
+            "classes": 2,
+            "notes": []
+        }
+    ]
+}

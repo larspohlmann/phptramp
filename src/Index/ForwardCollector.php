@@ -8,12 +8,14 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ArrowFunction;
+use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\NullsafeMethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
@@ -38,10 +40,20 @@ final class ForwardCollector extends NodeVisitorAbstract
     /** @var list<ForwardSite> */
     public array $forwards = [];
 
+    private bool $sawStore = false;
+
+    private bool $sawNonStore = false;
+
     public function __construct(
         private readonly string $name,
         private readonly bool $variadic,
     ) {
+    }
+
+    /** True when every occurrence of the parameter is a `$this->prop = $p` store. */
+    public function storesOnly(): bool
+    {
+        return $this->sawStore && ! $this->sawNonStore;
     }
 
     public function enterNode(Node $node): ?int
@@ -73,7 +85,7 @@ final class ForwardCollector extends NodeVisitorAbstract
     {
         foreach ($node->uses as $use) {
             if ($use->var->name === $this->name) {
-                $this->used = true;
+                $this->markUse(false);
             }
         }
     }
@@ -85,7 +97,7 @@ final class ForwardCollector extends NodeVisitorAbstract
             fn (Node $n): bool => $n instanceof Variable && $n->name === $this->name,
         );
         if ($hit !== null) {
-            $this->used = true;
+            $this->markUse(false);
         }
     }
 
@@ -93,12 +105,39 @@ final class ForwardCollector extends NodeVisitorAbstract
     {
         $forward = $this->asForward($node);
         if ($forward === null) {
-            $this->used = true;
+            $this->markUse($this->isThisPropertyStore($node));
 
             return;
         }
 
         $this->forwards[] = $forward;
+        $this->sawNonStore = true;
+    }
+
+    private function markUse(bool $isStore): void
+    {
+        $this->used = true;
+        if ($isStore) {
+            $this->sawStore = true;
+
+            return;
+        }
+
+        $this->sawNonStore = true;
+    }
+
+    private function isThisPropertyStore(Variable $var): bool
+    {
+        $assign = $var->getAttribute('parent');
+        if (! $assign instanceof Assign || $assign->expr !== $var) {
+            return false;
+        }
+
+        $target = $assign->var;
+
+        return $target instanceof PropertyFetch
+            && $target->var instanceof Variable
+            && $target->var->name === 'this';
     }
 
     private function asForward(Variable $var): ?ForwardSite
