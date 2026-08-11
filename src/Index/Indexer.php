@@ -14,6 +14,8 @@ use PhpParser\ParserFactory;
 /**
  * Parses the located files into a whole-project {@see MethodIndex}. Parameter
  * usage classification is delegated to {@see UsageClassifier}.
+ *
+ * @phpstan-import-type PendingMethod from IndexingVisitor
  */
 final class Indexer
 {
@@ -44,7 +46,31 @@ final class Indexer
             throw new ParseException("parse errors:\n" . implode("\n", $errors));
         }
 
-        return new MethodIndex($visitor->methods(), $visitor->classes());
+        return new MethodIndex($this->classifyPending($visitor->pending()), $visitor->classes());
+    }
+
+    /**
+     * @param list<PendingMethod> $pending
+     *
+     * @return array<string, MethodInfo>
+     */
+    private function classifyPending(array $pending): array
+    {
+        $classifier = new UsageClassifier();
+        $methods = [];
+        foreach ($pending as $entry) {
+            $node = $entry['node'];
+            $params = $classifier->classify($node->getParams(), $node->getStmts());
+            $methods[$entry['fqmn']] = new MethodInfo(
+                $entry['fqmn'],
+                $entry['file'],
+                $entry['line'],
+                $params,
+                $entry['class'],
+            );
+        }
+
+        return $methods;
     }
 
     private function indexFile(

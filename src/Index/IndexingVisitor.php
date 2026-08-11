@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace PhpTramp\Index;
 
 use PhpParser\Node;
-use PhpParser\Node\Identifier;
+use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Name;
-use PhpParser\Node\NullableType;
-use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -19,16 +17,21 @@ use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeVisitorAbstract;
 
 /**
- * Accumulates methods, functions, and class-hierarchy facts across every file
- * traversed. Relies on NameResolver (FQ names) and ParentConnectingVisitor
- * (the `parent` attribute) running before it in the traverser.
+ * Accumulates class-hierarchy facts and a list of pending function/method
+ * nodes across every file traversed. Parameter classification is deferred to
+ * the Indexer once the whole traversal (including NameResolver) has run, so
+ * that call targets inside bodies are already fully qualified.
+ *
+ * Relies on NameResolver (FQ names) and ParentConnectingVisitor (the `parent`
+ * attribute) running before it in the traverser.
  *
  * @phpstan-type ClassFacts array{parent: ?string, interfaces: list<string>, traits: list<string>}
+ * @phpstan-type PendingMethod array{fqmn: string, file: string, line: int, class: ?string, node: FunctionLike}
  */
 final class IndexingVisitor extends NodeVisitorAbstract
 {
-    /** @var array<string, MethodInfo> */
-    private array $methods = [];
+    /** @var list<PendingMethod> */
+    private array $pending = [];
 
     /** @var array<string, ClassFacts> */
     private array $classes = [];
@@ -56,11 +59,11 @@ final class IndexingVisitor extends NodeVisitorAbstract
     }
 
     /**
-     * @return array<string, MethodInfo>
+     * @return list<PendingMethod>
      */
-    public function methods(): array
+    public function pending(): array
     {
-        return $this->methods;
+        return $this->pending;
     }
 
     /**
@@ -126,14 +129,13 @@ final class IndexingVisitor extends NodeVisitorAbstract
             return;
         }
 
-        $fqmn = $fqcn . '::' . $node->name->toString();
-        $this->methods[$fqmn] = new MethodInfo(
-            $fqmn,
-            $this->file,
-            $node->getStartLine(),
-            $this->buildParams($node->params),
-            $fqcn,
-        );
+        $this->pending[] = [
+            'fqmn' => $fqcn . '::' . $node->name->toString(),
+            'file' => $this->file,
+            'line' => $node->getStartLine(),
+            'class' => $fqcn,
+            'node' => $node,
+        ];
     }
 
     private function recordFunction(Function_ $node): void
@@ -143,13 +145,13 @@ final class IndexingVisitor extends NodeVisitorAbstract
             return;
         }
 
-        $this->methods[$fqmn] = new MethodInfo(
-            $fqmn,
-            $this->file,
-            $node->getStartLine(),
-            $this->buildParams($node->params),
-            null,
-        );
+        $this->pending[] = [
+            'fqmn' => $fqmn,
+            'file' => $this->file,
+            'line' => $node->getStartLine(),
+            'class' => null,
+            'node' => $node,
+        ];
     }
 
     private function enclosingClassName(Node $node): ?string
@@ -160,45 +162,6 @@ final class IndexingVisitor extends NodeVisitorAbstract
         }
 
         return $parent->namespacedName?->toString();
-    }
-
-    /**
-     * @param array<Param> $params
-     * @return list<ParamInfo>
-     */
-    private function buildParams(array $params): array
-    {
-        $out = [];
-        foreach ($params as $position => $param) {
-            $var = $param->var;
-            if (! $var instanceof Node\Expr\Variable || ! is_string($var->name)) {
-                continue;
-            }
-
-            $out[] = new ParamInfo(
-                name: $var->name,
-                position: $position,
-                fate: ParamFate::Unused,
-                forwards: [],
-                byRef: $param->byRef,
-                variadic: $param->variadic,
-                type: $this->typeToString($param->type),
-            );
-        }
-
-        return $out;
-    }
-
-    private function typeToString(?Node $type): ?string
-    {
-        if ($type instanceof Name || $type instanceof Identifier) {
-            return $type->toString();
-        }
-        if ($type instanceof NullableType) {
-            return $this->typeToString($type->type);
-        }
-
-        return null;
     }
 
     /**
