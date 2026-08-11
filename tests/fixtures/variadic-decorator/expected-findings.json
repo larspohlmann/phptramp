@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "args",
+            "origin": "Demo\\Outer::run",
+            "terminal": "Demo\\Sink::consume",
+            "terminalKind": "used",
+            "hops": 2,
+            "chain": ["Demo\\Outer::run", "Demo\\Middle::run", "Demo\\Sink::consume"],
+            "classes": 3,
+            "notes": []
+        }
+    ]
+}

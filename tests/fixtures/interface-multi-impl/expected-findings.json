@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "config",
+            "origin": "Demo\\Controller::run",
+            "terminal": null,
+            "terminalKind": "truncated",
+            "hops": 1,
+            "chain": ["Demo\\Controller::run"],
+            "classes": 1,
+            "notes": ["truncated: 2 implementations"]
+        }
+    ]
+}

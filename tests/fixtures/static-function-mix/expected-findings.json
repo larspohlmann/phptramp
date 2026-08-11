@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "config",
+            "origin": "Demo\\entry",
+            "terminal": "Demo\\Sink::__construct",
+            "terminalKind": "stored",
+            "hops": 2,
+            "chain": ["Demo\\entry", "Demo\\Middle::relay", "Demo\\Sink::__construct"],
+            "classes": 2,
+            "notes": []
+        }
+    ]
+}

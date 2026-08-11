@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "config",
+            "origin": "Demo\\Controller::handle",
+            "terminal": "Demo\\Mailer::__construct",
+            "terminalKind": "stored",
+            "hops": 3,
+            "chain": ["Demo\\Controller::handle", "Demo\\ServiceA::process", "Demo\\ServiceB::run", "Demo\\Mailer::__construct"],
+            "classes": 4,
+            "notes": []
+        }
+    ]
+}

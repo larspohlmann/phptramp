@@ -1,0 +1,14 @@
+{
+    "findings": [
+        {
+            "param": "config",
+            "origin": "Demo\\Looper::go",
+            "terminal": null,
+            "terminalKind": "truncated",
+            "hops": 1,
+            "chain": ["Demo\\Looper::go"],
+            "classes": 1,
+            "notes": ["(recursive)"]
+        }
+    ]
+}
