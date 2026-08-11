@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PhpTramp\Index;
 
 use PhpTramp\Cache\FileIndexCache;
-use PhpTramp\Ignore\SuppressionIndex;
 
 /**
  * Orchestrates per-file indexing: each located file is parsed and classified
@@ -41,12 +40,8 @@ final class Indexer
         $mergedMethods = [];
         /** @var array<string, ClassInfo> $mergedClasses */
         $mergedClasses = [];
-        /** @var list<string> $suppressedMethods */
-        $suppressedMethods = [];
-        /** @var list<array{string, string}> $suppressedParams */
-        $suppressedParams = [];
-        /** @var array<string, list<int>> $suppressedLines */
-        $suppressedLines = [];
+        /** @var list<SuppressionParts> $suppressions */
+        $suppressions = [];
         $errors = [];
 
         foreach ($files as $file) {
@@ -63,11 +58,7 @@ final class Indexer
             foreach ($fileIndex->classes as $fqcn => $class) {
                 $mergedClasses[$fqcn] = $class;
             }
-            array_push($suppressedMethods, ...$fileIndex->suppressedMethods);
-            array_push($suppressedParams, ...$fileIndex->suppressedParams);
-            foreach ($fileIndex->suppressedLines as $suppressedFile => $lines) {
-                $suppressedLines[$suppressedFile] = $lines;
-            }
+            $suppressions[] = $fileIndex->suppression;
         }
 
         if ($errors !== []) {
@@ -77,7 +68,7 @@ final class Indexer
         return new MethodIndex(
             $mergedMethods,
             $mergedClasses,
-            new SuppressionIndex($suppressedMethods, $suppressedParams, $suppressedLines),
+            SuppressionParts::merge(...$suppressions)->toSuppressionIndex(),
         );
     }
 

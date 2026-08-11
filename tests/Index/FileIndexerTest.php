@@ -80,10 +80,10 @@ final class FileIndexerTest extends TestCase
     {
         $index = $this->index(self::SAMPLE);
 
-        self::assertContains('Demo\Service::handle', $index->suppressedMethods);
-        self::assertSame([['Demo\Service::handle', 'unused']], $index->suppressedParams);
-        self::assertArrayHasKey($this->file, $index->suppressedLines);
-        self::assertCount(1, $index->suppressedLines[$this->file]);
+        self::assertContains('Demo\Service::handle', $index->suppression->methods);
+        self::assertSame([['Demo\Service::handle', 'unused']], $index->suppression->params);
+        self::assertArrayHasKey($this->file, $index->suppression->lines);
+        self::assertCount(1, $index->suppression->lines[$this->file]);
     }
 
     public function testUnreadablePathThrowsParseExceptionNamingTheFile(): void

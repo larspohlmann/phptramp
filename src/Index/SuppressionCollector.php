@@ -79,16 +79,14 @@ final class SuppressionCollector
      * across per-file visitors and builds one index from the concatenation.
      *
      * @param list<PendingMethod> $pending
-     *
-     * @return array{methods: list<string>, params: list<array{string, string}>, lines: array<string, list<int>>}
      */
-    public function parts(array $pending): array
+    public function parts(array $pending): SuppressionParts
     {
-        return [
-            'methods' => $this->expandClassSuppressions($pending),
-            'params' => $this->suppressedParams,
-            'lines' => $this->ignoreLines,
-        ];
+        return new SuppressionParts(
+            $this->expandClassSuppressions($pending),
+            $this->suppressedParams,
+            $this->ignoreLines,
+        );
     }
 
     /**

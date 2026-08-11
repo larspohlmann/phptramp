@@ -58,14 +58,10 @@ final class FileIndexer
         $traverser->addVisitor($visitor);
         $traverser->traverse($ast);
 
-        $suppression = $visitor->suppressionParts();
-
         return new FileIndex(
             $this->classifyPending($visitor->pending()),
             $visitor->classes(),
-            $suppression['methods'],
-            $suppression['params'],
-            $suppression['lines'],
+            $visitor->suppressionParts(),
         );
     }
 

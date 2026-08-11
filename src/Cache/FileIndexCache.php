@@ -14,6 +14,7 @@ use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\MethodInfo;
 use PhpTramp\Index\ParamFate;
 use PhpTramp\Index\ParamInfo;
+use PhpTramp\Index\SuppressionParts;
 
 /**
  * Per-source-file cache of a serialized {@see FileIndex}. An entry is keyed by
@@ -31,7 +32,7 @@ final class FileIndexCache
      * Bump when {@see FileIndex} or any nested value object changes shape; a
      * cached entry written under an older format is silently ignored.
      */
-    private const FORMAT = 1;
+    private const FORMAT = 2;
 
     /** Directory permission mode for lazily-created cache directories. */
     private const DIRECTORY_MODE = 0o755;
@@ -39,6 +40,7 @@ final class FileIndexCache
     /** @var list<class-string> */
     private const ALLOWED_CLASSES = [
         FileIndex::class,
+        SuppressionParts::class,
         MethodInfo::class,
         ParamInfo::class,
         ParamFate::class,

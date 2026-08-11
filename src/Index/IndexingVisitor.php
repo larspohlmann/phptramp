@@ -82,10 +82,8 @@ final class IndexingVisitor extends NodeVisitorAbstract
      * they are aggregated into a {@see \PhpTramp\Ignore\SuppressionIndex}. The
      * Indexer merges these across files and builds one index from the
      * concatenation.
-     *
-     * @return array{methods: list<string>, params: list<array{string, string}>, lines: array<string, list<int>>}
      */
-    public function suppressionParts(): array
+    public function suppressionParts(): SuppressionParts
     {
         return $this->suppressionCollector->parts($this->pending);
     }
