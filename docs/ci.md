@@ -118,9 +118,10 @@ git commit -m "chore: snapshot phptramp baseline"
 ### Full-scan gate with baseline (the legacy-adoption job)
 
 A full scan that no longer fails on pre-existing findings — the baseline hides
-them, only *new* chains above `--limit` exit `1`. Pair with `--fail-on-stale` if
-the repo wants strict stale hygiene (exit `1` when a baseline entry matches
-nothing, so fixed chains get pruned from the file).
+them, only *new* chains above `--limit` exit `1`. The recipe below enables
+`--fail-on-stale`, so a stale baseline entry (one that matches nothing) exits
+`1` — fixed chains must be pruned from the file or CI stays red. Remove the
+flag to keep stale entries as stderr-only warnings with no exit-code impact.
 
 ```yaml
 name: phptramp (full scan)

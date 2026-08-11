@@ -105,7 +105,7 @@ implementation. Every bullet is a fixture.
 9. **Diff-aware mode:** any-hop intersection at changed-**line** granularity. A chain is
    reported iff at least one hop's signature line or forwarding call-site line falls in
    the diff. Intersecting hops are marked in output ("this hop is yours").
-10. **Baseline fingerprint:** `sha1(originFQMN + "\0" + paramName + "\0" + terminalFQMN)`
+10. **Baseline fingerprint:** `sha1(originFQMN + "\0" + paramName + "\0" + terminalToken)`
      — deliberately excludes line numbers and intermediate hops so refactors don't churn
      the baseline. The terminal component is the terminal FQMN when the chain has one,
      else the `TerminalKind` backing value (`external` / `truncated`) — NOT a per-reason
