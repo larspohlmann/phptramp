@@ -20,6 +20,7 @@ final class ReporterFactory
         return match ($options->format) {
             'text' => new TextReporter($thresholds, $options->explain),
             'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory)),
+            'github' => new GithubReporter($thresholds, new Paths($this->workingDirectory)),
             default => throw new InvalidArgsException("format '{$options->format}' is not implemented yet."),
         };
     }
