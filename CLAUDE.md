@@ -113,10 +113,11 @@ Enforced mechanically by `composer check` (and the PR mutation gate):
 
 ## Workflow
 
-- **git-flow.** Feature branches off `develop`; PRs merge into `develop`, never
-  `main`. Every merge to `develop` is shippable. `main` only ever moves through a
-  release. The AVH git-flow config is committed (`git flow feature start …`,
-  `git flow release start …`).
+- **git-flow (AVH).** Feature branches off `develop`; PRs merge into `develop`,
+  never `main`. Every merge to `develop` is shippable. `main` only ever moves
+  through a release. Config lives in `.git/config` (per clone) — run
+  `git flow init -d` once after cloning, with version-tag prefix `v`; then use
+  `git flow feature start …` and `git flow release start …`.
 - **Branch names embed the GitHub issue number**: `feature/2-chain-stitching`,
   `fix/17-untyped-receiver`.
 - `develop` is the repository's **default branch**, so a PR whose body says
