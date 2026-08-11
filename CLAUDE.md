@@ -51,6 +51,52 @@ line were wrong, do not tune the threshold. Inspect escaped mutants in
 | `src/Resolve/`, `src/Chain/` | call resolution + cross-file chain stitching (Phase 2) |
 | `tests/**` | mirrors `src/`; `tests/fixtures/<case>/` are input-codebase + expected-output pairs |
 
+## PHP code style — Clean Code is mandatory
+
+**All PHP must follow Clean Code principles.** This is not advisory: a change
+that passes the linters but leaves unclear, oversized, or duplicated code is not
+done.
+
+Non-negotiables:
+
+- **Names reveal intent.** No abbreviations, no `$data`/`$info`/`$tmp`, no
+  encodings. If a name needs a comment to be understood, rename it.
+- **Functions do one thing**, at a single level of abstraction, and stay short.
+  Extract until each method reads as a sentence about *what*, not *how*.
+- **Few parameters.** Three is a lot; more means a value object is missing.
+  **No boolean flag parameters** that select behaviour — split the method
+  instead. (A `bool` that is pure *data* on a value object, e.g. `ParamInfo`'s
+  `$byRef`, is fine.)
+- **Guard clauses over nesting.** Return early; never let indentation carry logic.
+- **No hidden side effects.** A method named `get…` does not mutate.
+- **Immutability by default.** `final class` with `readonly` promoted
+  constructor properties is the house style — the value objects in `src/Index/`
+  and `Options` already are. Prefer new instances over setters. `final` unless
+  the class is designed for extension.
+- **Errors are exceptions**, typed and namespaced next to what raises them
+  (`InvalidArgsException`, `Index\ParseException`). Never signal failure with
+  `null` or a magic value — reserve `null` for genuine "absent", as in
+  `MethodIndex::get()`.
+- **Comments explain *why*, never *what*.** The existing comments justify a
+  defensive branch or record a frozen-semantics decision — match that bar.
+  Delete commented-out code.
+- **DRY.** Third occurrence is a refactor, not a copy.
+- **Tests are production code** — same naming, same structure, same standards.
+  Fixture inputs under `tests/fixtures/` are the exception: they are analyzer
+  *input data*, excluded from PSR-12.
+
+Enforced mechanically by `composer check` (and the PR mutation gate):
+
+- **PSR-12** (`phpcs.xml.dist`), `declare(strict_types=1)` in every file.
+- **PHPStan level max** over `src/` and `bin/` — no baselines, no
+  `@phpstan-ignore` without a comment saying why. Fix the underlying type, do
+  not cast or widen to silence the error.
+- **PHPMD codesize** — cyclomatic/NPath complexity, method and class length,
+  parameter/field counts. **Standing rule: every `src/` file you touch must be
+  PHPMD-clean before commit**, not merely free of *new* findings. Fix the design
+  the metric points at; do not tune the threshold. A genuine value-object DTO
+  may carry a scoped `@SuppressWarnings` with a comment (see `Options`).
+
 ## Working style
 
 - **Strict fixture-first TDD, one task per commit.** Write the failing test,
