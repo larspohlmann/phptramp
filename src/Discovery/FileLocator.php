@@ -52,10 +52,16 @@ final class FileLocator
      */
     private function withoutExcluded(array $discovered, array $exclude): array
     {
+        if ($exclude === []) {
+            return $discovered;
+        }
+
+        $base = realpath($this->workingDirectory);
+
         $kept = [];
-        foreach ($discovered as $path => $true) {
-            if (! $this->isExcluded($path, $exclude)) {
-                $kept[$path] = $true;
+        foreach ($discovered as $path => $present) {
+            if (! $this->matchesAny($this->relativeTo($base, $path), $exclude)) {
+                $kept[$path] = $present;
             }
         }
 
@@ -65,10 +71,8 @@ final class FileLocator
     /**
      * @param list<string> $exclude
      */
-    private function isExcluded(string $path, array $exclude): bool
+    private function matchesAny(string $relative, array $exclude): bool
     {
-        $relative = $this->relativeToWorkingDirectory($path);
-
         foreach ($exclude as $pattern) {
             if (fnmatch($pattern, $relative)) {
                 return true;
@@ -78,9 +82,8 @@ final class FileLocator
         return false;
     }
 
-    private function relativeToWorkingDirectory(string $path): string
+    private function relativeTo(string|false $base, string $path): string
     {
-        $base = realpath($this->workingDirectory);
         if ($base === false) {
             return $path;
         }
