@@ -121,15 +121,7 @@ final class ConfigLoader
      */
     private function assignPaths(mixed $value, array &$folders, array &$files): void
     {
-        if (! is_array($value) || ! array_is_list($value)) {
-            throw new ConfigException('config key "paths" must be a list of strings');
-        }
-
-        foreach ($value as $path) {
-            if (! is_string($path)) {
-                throw new ConfigException('config key "paths" must be a list of strings');
-            }
-
+        foreach ($this->requireStringList('paths', $value) as $path) {
             if (str_ends_with($path, '.php')) {
                 $files[] = $path;
             } else {
