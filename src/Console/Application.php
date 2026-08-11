@@ -84,6 +84,7 @@ final class Application
     private function analyze(Options $options): int
     {
         try {
+            $thresholds = new Thresholds($options->limit, $options->warnLimit);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
         } catch (InvalidArgsException | ParseException $e) {
@@ -94,8 +95,6 @@ final class Application
 
         $findings = $this->findChains($index);
         fwrite($this->stdout, $reporter->render($findings));
-
-        $thresholds = new Thresholds($options->limit, $options->warnLimit);
 
         return $this->hasError($findings, $thresholds) ? 1 : 0;
     }
