@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PhpTramp\Index;
 
 use PhpParser\Node;
+use PhpParser\Node\AttributeGroup;
+use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Name;
+use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -16,6 +19,7 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeVisitorAbstract;
+use PhpTramp\Ignore\SuppressionIndex;
 
 /**
  * Accumulates class-hierarchy facts and a list of pending function/method
@@ -36,6 +40,18 @@ final class IndexingVisitor extends NodeVisitorAbstract
 
     /** @var array<string, ClassFacts> */
     private array $classes = [];
+
+    /** @var list<string> */
+    private array $suppressedMethods = [];
+
+    /** @var list<string> */
+    private array $suppressedClasses = [];
+
+    /** @var list<array{string, string}> */
+    private array $suppressedParams = [];
+
+    /** @var array<string, list<int>> */
+    private array $ignoreLines = [];
 
     private string $file = '';
 
@@ -65,6 +81,27 @@ final class IndexingVisitor extends NodeVisitorAbstract
     public function pending(): array
     {
         return $this->pending;
+    }
+
+    public function recordIgnoreComments(string $code): void
+    {
+        foreach (explode("\n", $code) as $index => $lineText) {
+            if (str_contains($lineText, '// phptramp-ignore')) {
+                $this->ignoreLines[$this->file][] = $index + 1;
+            }
+        }
+    }
+
+    public function suppressions(): SuppressionIndex
+    {
+        $methods = $this->suppressedMethods;
+        foreach ($this->pending as $entry) {
+            if ($entry['class'] !== null && in_array($entry['class'], $this->suppressedClasses, true)) {
+                $methods[] = $entry['fqmn'];
+            }
+        }
+
+        return new SuppressionIndex($methods, $this->suppressedParams, $this->ignoreLines);
     }
 
     /**
@@ -111,6 +148,10 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'interfaces' => $interfaces,
             'traits' => [],
         ];
+
+        if ($this->hasTrampIgnore($node->attrGroups)) {
+            $this->suppressedClasses[] = $fqcn;
+        }
     }
 
     private function kindOf(ClassLike $node): ClassKind
@@ -143,13 +184,16 @@ final class IndexingVisitor extends NodeVisitorAbstract
             return;
         }
 
+        $fqmn = $fqcn . '::' . $node->name->toString();
         $this->pending[] = [
-            'fqmn' => $fqcn . '::' . $node->name->toString(),
+            'fqmn' => $fqmn,
             'file' => $this->file,
             'line' => $node->getStartLine(),
             'class' => $fqcn,
             'node' => $node,
         ];
+
+        $this->recordFunctionLikeSuppressions($fqmn, $node);
     }
 
     private function recordFunction(Function_ $node): void
@@ -166,6 +210,46 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'class' => null,
             'node' => $node,
         ];
+
+        $this->recordFunctionLikeSuppressions($fqmn, $node);
+    }
+
+    private function recordFunctionLikeSuppressions(string $fqmn, FunctionLike $node): void
+    {
+        if ($this->hasTrampIgnore($node->getAttrGroups())) {
+            $this->suppressedMethods[] = $fqmn;
+        }
+
+        foreach ($node->getParams() as $param) {
+            if ($this->hasTrampIgnore($param->attrGroups)) {
+                $this->recordSuppressedParam($fqmn, $param);
+            }
+        }
+    }
+
+    private function recordSuppressedParam(string $fqmn, Param $param): void
+    {
+        if (! $param->var instanceof Variable || ! is_string($param->var->name)) {
+            return;
+        }
+
+        $this->suppressedParams[] = [$fqmn, $param->var->name];
+    }
+
+    /**
+     * @param array<AttributeGroup> $attrGroups
+     */
+    private function hasTrampIgnore(array $attrGroups): bool
+    {
+        foreach ($attrGroups as $group) {
+            foreach ($group->attrs as $attribute) {
+                if ($attribute->name->getLast() === 'TrampIgnore') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private function enclosingClassName(Node $node): ?string

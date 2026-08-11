@@ -245,4 +245,101 @@ final class ChainBuilderTest extends TestCase
         self::assertSame('aaa', $findings[0]->param);
         self::assertSame('bbb', $findings[1]->param);
     }
+
+    public function testMethodLevelAttributeOnMiddleHopKillsTheChain(): void
+    {
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { #[TrampIgnore] public function process(Cfg $config): void { '
+            . '(new ServiceB())->run($config); } } '
+            . 'class ServiceB { public function run(Cfg $config): void { $config->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
+
+    public function testParamLevelAttributeOnlyKillsChainsOfThatParam(): void
+    {
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class A { public function go(#[TrampIgnore] Cfg $ignored, Cfg $kept): void { '
+            . '(new B())->take($ignored); (new B())->take($kept); } } '
+            . 'class B { public function take(Cfg $p): void { $p->x(); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+        self::assertSame('kept', $findings[0]->param);
+    }
+
+    public function testAttributeOnAPlainFunctionMiddleHopKillsTheChain(): void
+    {
+        // Function-level (not method-level) attribute suppression: recordFunction
+        // must collect it, exactly like recordMethod does for class methods.
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { relay($p); } } '
+            . '#[TrampIgnore] function relay(Cfg $p): void { (new B())->take($p); } '
+            . 'class B { public function take(Cfg $p): void { $p->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
+
+    public function testClassLevelAttributeKillsAllChainsThroughAnyMethodOfTheClass(): void
+    {
+        // Two independent origins, each forwarding through a different method of
+        // the suppressed class ServiceA (process, alt) into Sink. Both chains
+        // must be dropped: class-level suppression covers every method.
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . '#[TrampIgnore] class ServiceA { '
+            . 'public function process(Cfg $config): void { (new Sink())->take($config); } '
+            . 'public function alt(Cfg $config): void { (new Sink())->take($config); } } '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } '
+            . 'public function handleAlt(Cfg $config): void { (new ServiceA())->alt($config); } } '
+            . 'class Sink { public function take(Cfg $config): void { $config->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
+
+    public function testIgnoreCommentOnForwardingCallSiteKillsTheChain(): void
+    {
+        $code = "<?php namespace Demo; class Cfg {}\n"
+            . "class A { public function go(Cfg \$p): void { (new B())->step(\$p); // phptramp-ignore\n } }\n"
+            . 'class B { public function step(Cfg $p): void { $p->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
+
+    public function testIgnoreCommentOnDeclarationLineKillsTheChain(): void
+    {
+        // Comment suppression targets a hop node's own declaration line. B::step
+        // must be a mid-chain hop (forwarding on to C), not the chain's terminal,
+        // since terminal nodes never suppress.
+        $code = "<?php namespace Demo; class Cfg {}\n"
+            . "class A { public function go(Cfg \$p): void { (new B())->step(\$p); } }\n"
+            . "class B { public function step(Cfg \$p): void { (new C())->use(\$p); } } // phptramp-ignore\n"
+            . 'class C { public function use(Cfg $p): void { $p->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
+
+    public function testIgnoreCommentOnLineAboveDeclarationKillsTheChain(): void
+    {
+        $code = "<?php namespace Demo; class Cfg {}\n"
+            . "class A { public function go(Cfg \$p): void { (new B())->step(\$p); } }\n"
+            . "class B {\n"
+            . "// phptramp-ignore\n"
+            . "public function step(Cfg \$p): void { (new C())->use(\$p); }\n"
+            . "}\n"
+            . 'class C { public function use(Cfg $p): void { $p->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
+
+    public function testIgnoreCommentOnUnrelatedLineDoesNotDropTheChain(): void
+    {
+        $code = "<?php namespace Demo; class Cfg {}\n"
+            . "// phptramp-ignore\n"
+            . "\n"
+            . "class A { public function go(Cfg \$p): void { (new B())->step(\$p); } }\n"
+            . "class B { public function step(Cfg \$p): void { \$p->x(); } }";
+
+        self::assertCount(1, $this->build($code));
+    }
 }
