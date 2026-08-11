@@ -65,11 +65,6 @@ final class FileIndexCache
             return null;
         }
 
-        $stat = @stat($realpath);
-        if ($stat === false) {
-            return null;
-        }
-
         $entryPath = $this->entryPath($realpath);
         $payload = @file_get_contents($entryPath);
         if ($payload === false) {
@@ -83,6 +78,11 @@ final class FileIndexCache
 
         $index = $data['index'] ?? null;
         if (!$index instanceof FileIndex) {
+            return null;
+        }
+
+        $stat = @stat($realpath);
+        if ($stat === false) {
             return null;
         }
 
