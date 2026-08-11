@@ -196,7 +196,7 @@ skeleton, README with the `composer tramp` script recipe, this plan.
 
 ---
 
-## Phase 1 — Usage classifier + index
+## Phase 1 — Usage classifier + index  ✅
 
 **Deliverable:** `phptramp --folder <dir> --dump-index` prints the classified method
 index as JSON. This makes the classifier — the semantic heart — independently shippable,
@@ -220,7 +220,7 @@ testable, and debuggable before any chain logic exists.
   `?string $generateBaseline = null`, `bool $dumpIndex = false`,
   `bool $help = false`, `bool $version = false`.
 
-- [ ] **Step 1: Write the failing tests** (`tests/Console/ArgvParserTest.php`):
+- [x] **Step 1: Write the failing tests** (`tests/Console/ArgvParserTest.php`):
 
 ```php
 <?php
@@ -307,12 +307,12 @@ final class ArgvParserTest extends TestCase
 }
 ```
 
-- [ ] **Step 2:** `vendor/bin/phpunit --filter ArgvParserTest` → FAIL (class not found).
-- [ ] **Step 3:** Implement: a `while` loop over args; flags taking values read the next
+- [x] **Step 2:** `vendor/bin/phpunit --filter ArgvParserTest` → FAIL (class not found).
+- [x] **Step 3:** Implement: a `while` loop over args; flags taking values read the next
   element; `--flag=value` split on the first `=`. Valid formats:
   `text|json|github|checkstyle|sarif|summary`.
-- [ ] **Step 4:** Test passes; `composer check` green.
-- [ ] **Step 5:** Commit `feat: argv parser and options object`.
+- [x] **Step 4:** Test passes; `composer check` green.
+- [x] **Step 5:** Commit `feat: argv parser and options object`.
 
 ### Task 1.2: FileLocator
 
@@ -325,7 +325,7 @@ final class ArgvParserTest extends TestCase
   each folder (RecursiveDirectoryIterator), plus explicit files; deduplicated, sorted,
   realpath-normalized; nonexistent path → `InvalidArgsException`.
 
-- [ ] Steps: failing test (folder recursion, dedup, sorted, missing path throws) → red →
+- [x] Steps: failing test (folder recursion, dedup, sorted, missing path throws) → red →
   implement → green → commit `feat: file discovery`.
 
 ### Task 1.3: Indexer skeleton (methods + params, no classification)
@@ -344,7 +344,7 @@ final class ArgvParserTest extends TestCase
 - Uses php-parser `NodeTraverser` + `NameResolver` (FQ names for free), `ParentConnectingVisitor`.
   Parse errors → collect and report file + message, exit 2.
 
-- [ ] Steps: failing test (fixture file with namespace, class, trait use, function;
+- [x] Steps: failing test (fixture file with namespace, class, trait use, function;
   assert FQMNs, param names/positions, by-ref flag, variadic flag, interface list) →
   red → implement → green → commit `feat: method index`.
 
@@ -370,7 +370,7 @@ final class ArgvParserTest extends TestCase
 4. Zero occurrences → `Unused`. Forwards only → `PureForward`. Any use → `Used`
    (forwards list kept anyway — Phase 4 needs call-site lines even for terminals).
 
-- [ ] **Step 1: Write the failing tests** (`tests/Index/UsageClassifierTest.php`).
+- [x] **Step 1: Write the failing tests** (`tests/Index/UsageClassifierTest.php`).
   The helper wraps a method body in a class, runs the real Indexer over a temp file,
   and returns the classified params — so these tests pin the *pipeline's* semantics,
   not a mock's:
@@ -510,10 +510,10 @@ final class UsageClassifierTest extends TestCase
   a constructor body `$this->x = $p;` → `Used`; same for a promoted property
   `public function __construct(private Cfg $p) {}` → `Used`.
 
-- [ ] **Step 2:** run → all red (enum/classes missing).
-- [ ] **Step 3:** implement the visitor per the algorithm above.
-- [ ] **Step 4:** all green; `composer check` green.
-- [ ] **Step 5:** Commit `feat: parameter usage classifier`.
+- [x] **Step 2:** run → all red (enum/classes missing).
+- [x] **Step 3:** implement the visitor per the algorithm above.
+- [x] **Step 4:** all green; `composer check` green.
+- [x] **Step 5:** Commit `feat: parameter usage classifier`.
 
 ### Task 1.5: `--dump-index` wiring + fixture harness
 
@@ -602,7 +602,7 @@ class Mailer
 
 (Methods with no params are omitted from `--dump-index` output to keep it stable.)
 
-- [ ] Steps: failing fixture test → wire pipeline in Application → green → commit
+- [x] Steps: failing fixture test → wire pipeline in Application → green → commit
   `feat: --dump-index and fixture harness`. **Phase exit:** CI matrix green.
 
 ---

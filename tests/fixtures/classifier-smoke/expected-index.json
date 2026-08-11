@@ -1,0 +1,20 @@
+{
+    "methods": {
+        "Demo\\Controller::handle": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "PureForward", "forwards": ["method:process@0"]}]
+        },
+        "Demo\\ServiceA::process": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "PureForward", "forwards": ["method:run@0"]}]
+        },
+        "Demo\\ServiceB::run": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "PureForward", "forwards": ["new:Demo\\Mailer@0"]}]
+        },
+        "Demo\\Mailer::__construct": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "Used", "forwards": []}]
+        }
+    }
+}
