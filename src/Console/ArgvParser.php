@@ -19,6 +19,7 @@ final class ArgvParser
         '--warn-limit',
         '--format',
         '--git-base',
+        '--diff',
         '--baseline',
         '--generate-baseline',
     ];
@@ -43,8 +44,7 @@ final class ArgvParser
     private ?int $warnLimit = null;
     private string $format = 'text';
     private bool $explain = false;
-    private bool $changedOnly = false;
-    private string $gitBase = 'origin/main';
+    private DiffAwareFlags $diffAware;
     private ?string $baseline = null;
     private ?string $generateBaseline = null;
     private bool $dumpIndex = false;
@@ -74,8 +74,9 @@ final class ArgvParser
             warnLimit: $this->warnLimit,
             format: $this->format,
             explain: $this->explain,
-            changedOnly: $this->changedOnly,
-            gitBase: $this->gitBase,
+            changedOnly: $this->diffAware->changedOnly,
+            gitBase: $this->diffAware->gitBase,
+            diff: $this->diffAware->diff,
             baseline: $this->baseline,
             generateBaseline: $this->generateBaseline,
             dumpIndex: $this->dumpIndex,
@@ -93,8 +94,7 @@ final class ArgvParser
         $this->warnLimit = $defaults->warnLimit;
         $this->format = $defaults->format;
         $this->explain = $defaults->explain;
-        $this->changedOnly = $defaults->changedOnly;
-        $this->gitBase = $defaults->gitBase;
+        $this->diffAware = new DiffAwareFlags($defaults->changedOnly, $defaults->gitBase, $defaults->diff);
         $this->baseline = $defaults->baseline;
         $this->generateBaseline = $defaults->generateBaseline;
         $this->dumpIndex = $defaults->dumpIndex;
@@ -146,7 +146,8 @@ final class ArgvParser
             '--limit' => $this->limit = $this->toInt($name, $value),
             '--warn-limit' => $this->warnLimit = $this->toInt($name, $value),
             '--format' => $this->format = $this->validateFormat($value),
-            '--git-base' => $this->gitBase = $value,
+            '--git-base' => $this->diffAware->gitBase = $value,
+            '--diff' => $this->applyDiffFlag($value),
             '--baseline' => $this->baseline = $value,
             '--generate-baseline' => $this->generateBaseline = $value,
             default => throw new InvalidArgsException("unknown option: {$name}"),
@@ -157,12 +158,22 @@ final class ArgvParser
     {
         match ($name) {
             '--explain' => $this->explain = true,
-            '--changed-only' => $this->changedOnly = true,
+            '--changed-only' => $this->diffAware->changedOnly = true,
             '--dump-index' => $this->dumpIndex = true,
             '--help', '-h' => $this->help = true,
             '--version', '-V' => $this->version = true,
             default => throw new InvalidArgsException("unknown option: {$name}"),
         };
+    }
+
+    /**
+     * A diff source with no filter to apply it to is contradictory, so
+     * --diff always turns --changed-only on.
+     */
+    private function applyDiffFlag(string $value): void
+    {
+        $this->diffAware->diff = $value;
+        $this->diffAware->changedOnly = true;
     }
 
     private function appendFolder(string $value): void

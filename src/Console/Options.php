@@ -28,6 +28,7 @@ final class Options
         public readonly bool $explain = false,
         public readonly bool $changedOnly = false,
         public readonly string $gitBase = 'origin/main',
+        public readonly ?string $diff = null,
         public readonly ?string $baseline = null,
         public readonly ?string $generateBaseline = null,
         public readonly bool $dumpIndex = false,

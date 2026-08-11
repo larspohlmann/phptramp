@@ -27,6 +27,7 @@ final class ArgvParserTest extends TestCase
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
         self::assertSame('origin/main', $o->gitBase);
+        self::assertNull($o->diff);
         self::assertNull($o->baseline);
         self::assertFalse($o->dumpIndex);
     }
@@ -109,6 +110,28 @@ final class ArgvParserTest extends TestCase
     public function testGitBaseParsed(): void
     {
         self::assertSame('develop', $this->parse('--git-base', 'develop')->gitBase);
+    }
+
+    public function testDiffSetsValueAndForcesChangedOnly(): void
+    {
+        $options = $this->parse('--diff', 'x.patch');
+
+        self::assertSame('x.patch', $options->diff);
+        self::assertTrue($options->changedOnly);
+    }
+
+    public function testDiffEqualsSyntaxWorks(): void
+    {
+        $options = $this->parse('--diff=x.patch');
+
+        self::assertSame('x.patch', $options->diff);
+        self::assertTrue($options->changedOnly);
+    }
+
+    public function testDiffWithoutValueThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--diff');
     }
 
     public function testBaselineParsed(): void

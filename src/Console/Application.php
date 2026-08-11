@@ -8,6 +8,10 @@ use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Config\ConfigException;
 use PhpTramp\Config\ConfigLoader;
+use PhpTramp\Diff\ChangedChainFilter;
+use PhpTramp\Diff\DiffException;
+use PhpTramp\Diff\DiffParser;
+use PhpTramp\Diff\GitDiffRunner;
 use PhpTramp\Discovery\FileLocator;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
@@ -31,14 +35,19 @@ final class Application
     /** @var resource */
     private $stderr;
 
+    /** @var resource */
+    private $stdin;
+
     /**
      * @param resource|null $stdout
      * @param resource|null $stderr
+     * @param resource|null $stdin
      */
-    public function __construct($stdout = null, $stderr = null)
+    public function __construct($stdout = null, $stderr = null, $stdin = null)
     {
         $this->stdout = $stdout ?? \STDOUT;
         $this->stderr = $stderr ?? \STDERR;
+        $this->stdin = $stdin ?? \STDIN;
     }
 
     /**
@@ -87,16 +96,65 @@ final class Application
             $thresholds = new Thresholds($options->limit, $options->warnLimit);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
-        } catch (InvalidArgsException | ParseException $e) {
+            $findings = $this->changedOnlyFindings($this->findChains($index), $options);
+        } catch (InvalidArgsException | ParseException | DiffException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
         }
 
-        $findings = $this->findChains($index);
         fwrite($this->stdout, $reporter->render($findings));
 
         return $this->hasError($findings, $thresholds) ? 1 : 0;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function changedOnlyFindings(array $findings, Options $options): array
+    {
+        if (! $options->changedOnly) {
+            return $findings;
+        }
+
+        $changedLines = (new DiffParser())->parse($this->acquireDiffText($options))
+            ->resolveAgainst($this->workingDirectory());
+
+        return (new ChangedChainFilter($changedLines))->filter($findings);
+    }
+
+    private function acquireDiffText(Options $options): string
+    {
+        if ($options->diff === null) {
+            return (new GitDiffRunner())->run($options->gitBase, $this->workingDirectory());
+        }
+
+        if ($options->diff === '-') {
+            return $this->readStdin();
+        }
+
+        return $this->readDiffFile($options->diff);
+    }
+
+    private function readDiffFile(string $path): string
+    {
+        $contents = @file_get_contents($path);
+        if ($contents === false) {
+            throw new DiffException("unable to read diff file: {$path}");
+        }
+
+        return $contents;
+    }
+
+    private function readStdin(): string
+    {
+        $contents = stream_get_contents($this->stdin);
+        if ($contents === false) {
+            throw new DiffException('unable to read diff from stdin');
+        }
+
+        return $contents;
     }
 
     /**
@@ -203,6 +261,7 @@ final class Application
             Diff-aware mode:
               --changed-only            Only report chains touching changed lines
               --git-base <ref>          Diff base for --changed-only (default: origin/main)
+              --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
 
             Baseline:
               --baseline <file>         Ignore findings recorded in the baseline file
