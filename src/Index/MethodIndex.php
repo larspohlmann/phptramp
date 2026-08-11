@@ -37,4 +37,12 @@ final class MethodIndex
     {
         return $this->classes[$fqcn] ?? null;
     }
+
+    /**
+     * @return iterable<string, ClassInfo>
+     */
+    public function allClasses(): iterable
+    {
+        return $this->classes;
+    }
 }
