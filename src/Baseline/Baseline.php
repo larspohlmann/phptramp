@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace PhpTramp\Baseline;
 
 use PhpTramp\Chain\Finding;
+use PhpTramp\Report\JsonEncoder;
 
 /**
- * A parsed baseline document: a set of refactor-stable finding fingerprints
- * plus the raw entry lines they came from. Parse is strict — a typo'd key or
+ * A parsed baseline document: refactor-stable finding fingerprints mapped to
+ * the raw entry lines they came from. Parse is strict — a typo'd key or
  * wrong-typed value throws, never silently un-gating CI. {@see generate()}
  * round-trips byte-stably on an unchanged tree.
  */
 final class Baseline
 {
     /**
-     * @param list<string> $fingerprints sha1 hashes only, context already stripped
-     * @param list<string> $lines raw entry lines (with human context); kept so
-     *                            staleEntries() can report the original text
+     * @param array<string, string> $entriesByHash fingerprint hash => the raw
+     *        entry line it came from (with human context); the line is kept so
+     *        staleEntries() can report the original text
      */
     private function __construct(
-        private readonly array $fingerprints,
-        private readonly array $lines,
+        private readonly array $entriesByHash,
     ) {
     }
 
@@ -37,29 +37,37 @@ final class Baseline
         $document = self::decode($json);
         $entries = self::fingerprintsValue($document);
         $lines = self::stringEntries($entries);
-        $hashes = array_map(self::hashOf(...), $lines);
 
-        return new self($hashes, $lines);
+        $entriesByHash = [];
+        foreach ($lines as $line) {
+            $entriesByHash[self::hashOf($line)] = $line;
+        }
+
+        return new self($entriesByHash);
     }
 
     public function has(Finding $finding): bool
     {
-        return in_array(Fingerprint::of($finding), $this->fingerprints, true);
+        return isset($this->entriesByHash[Fingerprint::of($finding)]);
     }
 
     /**
-     * True for entries whose hash matched no finding passed in.
+     * The raw entry lines whose fingerprint matched no finding passed in, in
+     * document order.
      *
      * @param list<Finding> $findings
      * @return list<string> raw entry lines
      */
     public function staleEntries(array $findings): array
     {
-        $liveHashes = array_map(Fingerprint::of(...), $findings);
+        $liveHashes = [];
+        foreach ($findings as $finding) {
+            $liveHashes[Fingerprint::of($finding)] = true;
+        }
 
         $stale = [];
-        foreach ($this->lines as $index => $line) {
-            if (! in_array($this->fingerprints[$index], $liveHashes, true)) {
+        foreach ($this->entriesByHash as $hash => $line) {
+            if (! isset($liveHashes[$hash])) {
                 $stale[] = $line;
             }
         }
@@ -78,10 +86,7 @@ final class Baseline
         $lines = array_map(Fingerprint::line(...), $findings);
         sort($lines);
 
-        return json_encode(
-            ['fingerprints' => $lines],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
-        ) . "\n";
+        return (new JsonEncoder())->encode(['fingerprints' => $lines], 'baseline') . "\n";
     }
 
     private static function decode(string $json): \stdClass
