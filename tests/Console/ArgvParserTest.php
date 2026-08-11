@@ -79,4 +79,98 @@ final class ArgvParserTest extends TestCase
         $this->expectException(InvalidArgsException::class);
         $this->parse('--format', 'xml');
     }
+
+    public function testWarnLimitParsed(): void
+    {
+        self::assertSame(2, $this->parse('--warn-limit', '2')->warnLimit);
+    }
+
+    public function testFormatParsed(): void
+    {
+        self::assertSame('json', $this->parse('--format', 'json')->format);
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function validFormatProvider(): iterable
+    {
+        foreach (['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
+            yield $format => [$format];
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('validFormatProvider')]
+    public function testEveryDocumentedFormatIsAccepted(string $format): void
+    {
+        self::assertSame($format, $this->parse('--format', $format)->format);
+    }
+
+    public function testGitBaseParsed(): void
+    {
+        self::assertSame('develop', $this->parse('--git-base', 'develop')->gitBase);
+    }
+
+    public function testBaselineParsed(): void
+    {
+        self::assertSame('bl.json', $this->parse('--baseline', 'bl.json')->baseline);
+    }
+
+    public function testGenerateBaselineParsed(): void
+    {
+        self::assertSame('out.json', $this->parse('--generate-baseline', 'out.json')->generateBaseline);
+    }
+
+    public function testExplainFlag(): void
+    {
+        self::assertTrue($this->parse('--explain')->explain);
+    }
+
+    public function testChangedOnlyFlag(): void
+    {
+        self::assertTrue($this->parse('--changed-only')->changedOnly);
+    }
+
+    public function testDumpIndexFlag(): void
+    {
+        self::assertTrue($this->parse('--dump-index')->dumpIndex);
+    }
+
+    public function testHelpFlags(): void
+    {
+        self::assertTrue($this->parse('--help')->help);
+        self::assertTrue($this->parse('-h')->help);
+    }
+
+    public function testVersionFlags(): void
+    {
+        self::assertTrue($this->parse('--version')->version);
+        self::assertTrue($this->parse('-V')->version);
+    }
+
+    public function testNonNumericWarnLimitThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--warn-limit', 'x');
+    }
+
+    public function testUnknownFormatMessageNamesTheValue(): void
+    {
+        try {
+            $this->parse('--format', 'xml');
+            self::fail('expected InvalidArgsException');
+        } catch (InvalidArgsException $e) {
+            self::assertStringContainsString('xml', $e->getMessage());
+        }
+    }
+
+    public function testMissingValueMessageNamesTheFlag(): void
+    {
+        try {
+            $this->parse('--limit');
+            self::fail('expected InvalidArgsException');
+        } catch (InvalidArgsException $e) {
+            self::assertStringContainsString('--limit', $e->getMessage());
+        }
+    }
 }

@@ -99,4 +99,17 @@ final class FileLocatorTest extends TestCase
         $this->expectException(InvalidArgsException::class);
         $this->locate(new Options(files: [$this->root . '/ghost.php']));
     }
+
+    public function testExistingFileGivenAsFolderThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->locate(new Options(folders: [$this->root . '/a.php']));
+    }
+
+    public function testUppercasePhpExtensionIsMatchedCaseInsensitively(): void
+    {
+        file_put_contents($this->root . '/Upper.PHP', "<?php\n");
+
+        self::assertContains($this->real('Upper.PHP'), $this->locate(new Options(folders: [$this->root])));
+    }
 }

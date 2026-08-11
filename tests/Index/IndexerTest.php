@@ -134,4 +134,15 @@ final class IndexerTest extends TestCase
         $this->expectException(ParseException::class);
         $this->index("<?php class Broken {");
     }
+
+    public function testParseErrorMessageNamesTheFileAndReason(): void
+    {
+        try {
+            $this->index("<?php class Broken {");
+            self::fail('expected ParseException');
+        } catch (ParseException $e) {
+            self::assertStringContainsString('parse errors', $e->getMessage());
+            self::assertStringContainsString($this->file, $e->getMessage());
+        }
+    }
 }

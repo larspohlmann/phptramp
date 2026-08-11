@@ -16,10 +16,10 @@ final class ParamInfo
         public readonly string $name,
         public readonly int $position,
         public readonly ParamFate $fate,
-        public readonly array $forwards = [],
-        public readonly bool $byRef = false,
-        public readonly bool $variadic = false,
-        public readonly ?string $type = null,
+        public readonly array $forwards,
+        public readonly bool $byRef,
+        public readonly bool $variadic,
+        public readonly ?string $type,
     ) {
     }
 }
