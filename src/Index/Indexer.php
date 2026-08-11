@@ -4,42 +4,57 @@ declare(strict_types=1);
 
 namespace PhpTramp\Index;
 
-use PhpParser\Error;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\NodeVisitor\ParentConnectingVisitor;
-use PhpParser\Parser;
-use PhpParser\ParserFactory;
+use PhpTramp\Ignore\SuppressionIndex;
 
 /**
- * Parses the located files into a whole-project {@see MethodIndex}. Parameter
- * usage classification is delegated to {@see UsageClassifier}.
+ * Orchestrates per-file indexing: each located file is parsed and classified
+ * by {@see FileIndexer} in isolation, then the per-file results are merged in
+ * input order into one whole-project {@see MethodIndex}. The merge preserves
+ * the prior single-visitor accumulation semantics — later files win on
+ * duplicate FQMN/FQCN keys, suppression parts are concatenated — so the
+ * resulting index is byte-identical to the pre-refactor output.
  *
  * @phpstan-import-type PendingMethod from IndexingVisitor
  */
 final class Indexer
 {
+    public function __construct(
+        private readonly FileIndexer $fileIndexer = new FileIndexer(),
+    ) {
+    }
+
     /**
      * @param list<string> $files
      *
-     * @throws ParseException if any file cannot be read or parsed
+     * @throws ParseException if any file cannot be read or parsed (per-file messages joined)
      */
     public function index(array $files): MethodIndex
     {
-        $parser = (new ParserFactory())->createForNewestSupportedVersion();
-
-        $visitor = new IndexingVisitor();
-        $traverser = new NodeTraverser();
-        $traverser->addVisitor(new NameResolver());
-        $traverser->addVisitor(new ParentConnectingVisitor());
-        $traverser->addVisitor($visitor);
-
+        /** @var array<string, MethodInfo> $mergedMethods */
+        $mergedMethods = [];
+        /** @var array<string, ClassInfo> $mergedClasses */
+        $mergedClasses = [];
+        /** @var list<string> $suppressedMethods */
+        $suppressedMethods = [];
+        /** @var list<array{string, string}> $suppressedParams */
+        $suppressedParams = [];
+        /** @var array<string, list<int>> $suppressedLines */
+        $suppressedLines = [];
         $errors = [];
+
         foreach ($files as $file) {
-            $error = $this->indexFile($parser, $traverser, $visitor, $file);
-            if ($error !== null) {
-                $errors[] = $error;
+            try {
+                $fileIndex = $this->fileIndexer->index($file);
+            } catch (ParseException $e) {
+                $errors[] = $e->getMessage();
+                continue;
             }
+
+            $mergedMethods = array_merge($mergedMethods, $fileIndex->methods);
+            $mergedClasses = array_merge($mergedClasses, $fileIndex->classes);
+            array_push($suppressedMethods, ...$fileIndex->suppressedMethods);
+            array_push($suppressedParams, ...$fileIndex->suppressedParams);
+            $suppressedLines = array_merge($suppressedLines, $fileIndex->suppressedLines);
         }
 
         if ($errors !== []) {
@@ -47,61 +62,9 @@ final class Indexer
         }
 
         return new MethodIndex(
-            $this->classifyPending($visitor->pending()),
-            $visitor->classes(),
-            $visitor->suppressions(),
+            $mergedMethods,
+            $mergedClasses,
+            new SuppressionIndex($suppressedMethods, $suppressedParams, $suppressedLines),
         );
-    }
-
-    /**
-     * @param list<PendingMethod> $pending
-     *
-     * @return array<string, MethodInfo>
-     */
-    private function classifyPending(array $pending): array
-    {
-        $classifier = new UsageClassifier();
-        $methods = [];
-        foreach ($pending as $entry) {
-            $node = $entry['node'];
-            $params = $classifier->classify($node->getParams(), $node->getStmts());
-            $methods[$entry['fqmn']] = new MethodInfo(
-                $entry['fqmn'],
-                $entry['file'],
-                $entry['line'],
-                $params,
-                $entry['class'],
-            );
-        }
-
-        return $methods;
-    }
-
-    private function indexFile(
-        Parser $parser,
-        NodeTraverser $traverser,
-        IndexingVisitor $visitor,
-        string $file
-    ): ?string {
-        $code = @file_get_contents($file);
-        if ($code === false) {
-            return "{$file}: could not read file";
-        }
-
-        try {
-            $ast = $parser->parse($code);
-        } catch (Error $e) {
-            return "{$file}: {$e->getMessage()}";
-        }
-
-        if ($ast === null) {
-            return "{$file}: could not parse file";
-        }
-
-        $visitor->setFile($file);
-        $visitor->recordIgnoreComments($code);
-        $traverser->traverse($ast);
-
-        return null;
     }
 }

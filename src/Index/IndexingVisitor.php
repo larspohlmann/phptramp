@@ -16,7 +16,6 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeVisitorAbstract;
-use PhpTramp\Ignore\SuppressionIndex;
 
 /**
  * Accumulates class-hierarchy facts and a list of pending function/method
@@ -78,9 +77,17 @@ final class IndexingVisitor extends NodeVisitorAbstract
         $this->suppressionCollector->recordIgnoreComments($this->file, $code);
     }
 
-    public function suppressions(): SuppressionIndex
+    /**
+     * The raw suppression parts accumulated for the files seen so far, before
+     * they are aggregated into a {@see \PhpTramp\Ignore\SuppressionIndex}. The
+     * Indexer merges these across files and builds one index from the
+     * concatenation.
+     *
+     * @return array{methods: list<string>, params: list<array{string, string}>, lines: array<string, list<int>>}
+     */
+    public function suppressionParts(): array
     {
-        return $this->suppressionCollector->suppressions($this->pending);
+        return $this->suppressionCollector->parts($this->pending);
     }
 
     /**

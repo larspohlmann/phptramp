@@ -8,14 +8,15 @@ use PhpParser\Node\AttributeGroup;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Param;
-use PhpTramp\Ignore\SuppressionIndex;
 
 /**
  * Accumulates every `TrampIgnore` attribute and `// phptramp-ignore` comment
- * seen while {@see IndexingVisitor} traverses a project, and turns them into a
- * {@see SuppressionIndex}. A separate collaborator so that suppression
- * bookkeeping - a distinct responsibility from recording the class hierarchy
- * and pending methods - does not inflate IndexingVisitor's own complexity.
+ * seen while {@see IndexingVisitor} traverses a file, and exposes them as the
+ * raw parts the Indexer merges across files before building a
+ * {@see \PhpTramp\Ignore\SuppressionIndex}. A separate collaborator so that
+ * suppression bookkeeping - a distinct responsibility from recording the class
+ * hierarchy and pending methods - does not inflate IndexingVisitor's own
+ * complexity.
  *
  * Attribute matching is by short name only: an attribute counts iff its
  * name's last segment is `TrampIgnore`, so analyzed codebases are never
@@ -73,15 +74,21 @@ final class SuppressionCollector
     }
 
     /**
+     * The raw suppression parts accumulated so far, before they are aggregated
+     * into a {@see \PhpTramp\Ignore\SuppressionIndex}. The Indexer merges these
+     * across per-file visitors and builds one index from the concatenation.
+     *
      * @param list<PendingMethod> $pending
+     *
+     * @return array{methods: list<string>, params: list<array{string, string}>, lines: array<string, list<int>>}
      */
-    public function suppressions(array $pending): SuppressionIndex
+    public function parts(array $pending): array
     {
-        return new SuppressionIndex(
-            $this->expandClassSuppressions($pending),
-            $this->suppressedParams,
-            $this->ignoreLines,
-        );
+        return [
+            'methods' => $this->expandClassSuppressions($pending),
+            'params' => $this->suppressedParams,
+            'lines' => $this->ignoreLines,
+        ];
     }
 
     /**
