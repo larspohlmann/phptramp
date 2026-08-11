@@ -12,39 +12,64 @@ use PhpTramp\Chain\Hop;
  * label column is at least as wide as the widest fixed label ("terminal") and
  * the method column is padded to the longest method entry in each finding.
  */
-final class TextReporter
+final class TextReporter implements Reporter
 {
     private const INDENT = '  ';
     private const COLUMN_GAP = '  ';
     private const MIN_LABEL_WIDTH = 8;
 
+    private readonly Pluralizer $pluralizer;
+
     public function __construct(
-        private readonly int $limit,
+        private readonly Thresholds $thresholds,
+        private readonly Paths $paths,
         private readonly bool $explain = false,
     ) {
+        $this->pluralizer = new Pluralizer();
     }
 
     /**
-     * @param list<Finding> $findings already filtered to hops >= limit
+     * @param list<Finding> $findings ALL findings, unfiltered
      */
     public function render(array $findings): string
     {
-        if ($findings === []) {
+        $reportable = $this->reportableFindings($findings);
+        if ($reportable === []) {
             return 'No tramp data found (' . $this->limitClause() . ").\n";
         }
 
-        $blocks = array_map($this->renderFinding(...), $findings);
+        $blocks = array_map(
+            fn (array $reportableFinding): string => $this->renderFinding(...$reportableFinding),
+            $reportable,
+        );
 
-        return implode("\n\n", $blocks) . "\n\n" . $this->summary(count($findings)) . "\n";
+        return implode("\n\n", $blocks) . "\n\n" . $this->summary($reportable) . "\n";
     }
 
-    private function renderFinding(Finding $finding): string
+    /**
+     * @param list<Finding> $findings
+     * @return list<array{0: Finding, 1: Severity}>
+     */
+    private function reportableFindings(array $findings): array
+    {
+        $reportable = [];
+        foreach ($findings as $finding) {
+            $severity = $this->thresholds->severityOf($finding);
+            if ($severity !== null) {
+                $reportable[] = [$finding, $severity];
+            }
+        }
+
+        return $reportable;
+    }
+
+    private function renderFinding(Finding $finding, Severity $severity): string
     {
         $hopRows = $this->hopRows($finding);
         $labelWidth = $this->labelWidth($hopRows, $finding->notes);
         $methodWidth = $this->methodWidth($hopRows);
 
-        $lines = [$this->header($finding)];
+        $lines = [$this->header($finding, $severity)];
         foreach ($hopRows as $row) {
             $lines[] = $this->hopLine($row, $labelWidth, $methodWidth);
         }
@@ -110,7 +135,7 @@ final class TextReporter
 
     private function location(Hop $hop): string
     {
-        return $hop->file . ':' . $hop->line;
+        return $this->paths->relativize($hop->file) . ':' . $hop->line;
     }
 
     /**
@@ -161,29 +186,42 @@ final class TextReporter
         return max($widths);
     }
 
-    private function header(Finding $finding): string
+    private function header(Finding $finding, Severity $severity): string
     {
-        return 'FINDING  $' . $finding->param . ': '
-            . $finding->hops . ' pass-through ' . $this->plural($finding->hops, 'hop')
-            . ' across ' . $finding->classes . ' ' . $this->plural($finding->classes, 'class', 'classes');
+        $keyword = $severity === Severity::Warning ? 'WARNING' : 'FINDING';
+
+        return $keyword . '  $' . $finding->param . ': '
+            . $finding->hops . ' pass-through ' . $this->pluralizer->of($finding->hops, 'hop')
+            . ' across ' . $finding->classes . ' ' . $this->pluralizer->of($finding->classes, 'class', 'classes');
     }
 
-    private function summary(int $count): string
+    /**
+     * @param list<array{0: Finding, 1: Severity}> $reportable
+     */
+    private function summary(array $reportable): string
     {
-        return $count . ' ' . $this->plural($count, 'finding') . ' (' . $this->limitClause() . ').';
+        $count = count($reportable);
+        if ($this->thresholds->warnLimit === null) {
+            return $count . ' ' . $this->pluralizer->of($count, 'finding') . ' (' . $this->limitClause() . ').';
+        }
+
+        $errorCount = count(array_filter($reportable, static fn (array $entry): bool => $entry[1] === Severity::Error));
+        $warningCount = $count - $errorCount;
+
+        return $count . ' ' . $this->pluralizer->of($count, 'finding') . ' ('
+            . $errorCount . ' ' . $this->pluralizer->of($errorCount, 'error') . ', '
+            . $warningCount . ' ' . $this->pluralizer->of($warningCount, 'warning') . '; '
+            . $this->limitClause() . ').';
     }
 
     private function limitClause(): string
     {
-        return 'limit: ' . $this->limit . ' ' . $this->plural($this->limit, 'hop');
-    }
-
-    private function plural(int $count, string $singular, ?string $plural = null): string
-    {
-        if ($count === 1) {
-            return $singular;
+        $clause = 'limit: ' . $this->thresholds->limit . ' ' . $this->pluralizer->of($this->thresholds->limit, 'hop');
+        if ($this->thresholds->warnLimit !== null) {
+            $clause .= ', warn-limit: ' . $this->thresholds->warnLimit
+                . ' ' . $this->pluralizer->of($this->thresholds->warnLimit, 'hop');
         }
 
-        return $plural ?? $singular . 's';
+        return $clause;
     }
 }

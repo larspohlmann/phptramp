@@ -97,13 +97,119 @@ final class ApplicationTest extends TestCase
         self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
     }
 
-    public function testUnsupportedFormatExitsWithToolErrorCode(): void
+    public function testUnknownFormatExitsWithToolErrorCode(): void
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'json']));
-        self::assertStringContainsString('not implemented', self::contents($this->stderr));
+        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'xml']));
+        self::assertStringContainsString('unknown format: xml', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
+    }
+
+    public function testSummaryFormatReportsAllChainsAndExitsOne(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--format', 'summary']));
+        self::assertStringContainsString('at or over the limit', self::contents($this->stdout));
+    }
+
+    public function testJsonFormatReportsFindingsAndExitsOne(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--format', 'json']));
+
+        $output = self::contents($this->stdout);
+        self::assertStringContainsString('"findings"', $output);
+        self::assertStringContainsString('"severity": "error"', $output);
+    }
+
+    public function testWarnOnlyRunExitsZeroButPrintsWarning(): void
+    {
+        $folder = $this->fixtureWithTwoHopChain();
+
+        self::assertSame(
+            0,
+            $this->app->run(['phptramp', '--folder', $folder, '--limit', '3', '--warn-limit', '2']),
+        );
+        self::assertStringContainsString('WARNING', self::contents($this->stdout));
+    }
+
+    /**
+     * Thresholds validation must happen before the codebase is indexed, so an
+     * invalid --warn-limit/--limit combination fails fast: the fixture here is
+     * a normal, successfully-parsing 1-hop chain, since fail-fast only changes
+     * *when* the error surfaces, not whether this particular folder would
+     * parse.
+     */
+    public function testInvalidWarnLimitFailsFastWithThresholdError(): void
+    {
+        $folder = $this->fixtureWithOneHopChain();
+
+        $exitCode = $this->app->run(['phptramp', '--folder', $folder, '--limit', '3', '--warn-limit', '5']);
+
+        self::assertSame(2, $exitCode);
+        self::assertStringContainsString(
+            'warn-limit (5) must be lower than limit (3)',
+            self::contents($this->stderr),
+        );
+    }
+
+    public function testConfigFileLimitAppliesWithoutCliFlag(): void
+    {
+        $directory = sys_get_temp_dir() . '/phptramp-cwd-' . uniqid();
+        mkdir($directory);
+        $this->folders[] = $directory;
+
+        file_put_contents($directory . '/phptramp.json', '{"limit": 1}');
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($directory . '/Demo.php', $code);
+
+        $previousCwd = getcwd();
+        self::assertIsString($previousCwd);
+
+        try {
+            chdir($directory);
+            $exitCode = $this->app->run(['phptramp', '--folder', $directory]);
+        } finally {
+            chdir($previousCwd);
+        }
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('FINDING', self::contents($this->stdout));
+    }
+
+    private function fixtureWithOneHopChain(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
+    }
+
+    private function fixtureWithTwoHopChain(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { public function process(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
     }
 
     private function fixtureWithThreeHopChain(): string

@@ -16,6 +16,7 @@ use PhpParser\Node\Stmt\Interface_;
 use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeVisitorAbstract;
+use PhpTramp\Ignore\SuppressionIndex;
 
 /**
  * Accumulates class-hierarchy facts and a list of pending function/method
@@ -38,6 +39,11 @@ final class IndexingVisitor extends NodeVisitorAbstract
     private array $classes = [];
 
     private string $file = '';
+
+    public function __construct(
+        private readonly SuppressionCollector $suppressionCollector = new SuppressionCollector(),
+    ) {
+    }
 
     public function setFile(string $file): void
     {
@@ -65,6 +71,16 @@ final class IndexingVisitor extends NodeVisitorAbstract
     public function pending(): array
     {
         return $this->pending;
+    }
+
+    public function recordIgnoreComments(string $code): void
+    {
+        $this->suppressionCollector->recordIgnoreComments($this->file, $code);
+    }
+
+    public function suppressions(): SuppressionIndex
+    {
+        return $this->suppressionCollector->suppressions($this->pending);
     }
 
     /**
@@ -111,6 +127,8 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'interfaces' => $interfaces,
             'traits' => [],
         ];
+
+        $this->suppressionCollector->recordClassAttributes($fqcn, $node->attrGroups);
     }
 
     private function kindOf(ClassLike $node): ClassKind
@@ -143,13 +161,16 @@ final class IndexingVisitor extends NodeVisitorAbstract
             return;
         }
 
+        $fqmn = $fqcn . '::' . $node->name->toString();
         $this->pending[] = [
-            'fqmn' => $fqcn . '::' . $node->name->toString(),
+            'fqmn' => $fqmn,
             'file' => $this->file,
             'line' => $node->getStartLine(),
             'class' => $fqcn,
             'node' => $node,
         ];
+
+        $this->suppressionCollector->recordFunctionLikeAttributes($fqmn, $node);
     }
 
     private function recordFunction(Function_ $node): void
@@ -166,6 +187,8 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'class' => null,
             'node' => $node,
         ];
+
+        $this->suppressionCollector->recordFunctionLikeAttributes($fqmn, $node);
     }
 
     private function enclosingClassName(Node $node): ?string

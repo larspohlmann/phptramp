@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Chain;
 
+use PhpTramp\Ignore\SuppressionIndex;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\MethodInfo;
@@ -35,10 +36,13 @@ final class ChainTraversal
     /** @var array<string, true> */
     private array $visited = [];
 
+    private readonly SuppressionIndex $suppressions;
+
     public function __construct(
         private readonly MethodIndex $index,
         private readonly CallResolver $resolver,
     ) {
+        $this->suppressions = $index->suppressions();
     }
 
     /**
@@ -182,6 +186,10 @@ final class ChainTraversal
 
     private function record(PartialChain $chain, Terminal $terminal): void
     {
+        if ($this->isSuppressedChain($chain)) {
+            return;
+        }
+
         $fullChain = $terminal->hop === null ? $chain->hops : [...$chain->hops, $terminal->hop];
 
         $this->findings[] = new Finding(
@@ -195,6 +203,34 @@ final class ChainTraversal
             $terminal->notes,
             $chain->trace,
         );
+    }
+
+    private function isSuppressedChain(PartialChain $chain): bool
+    {
+        foreach ($chain->hops as $index => $hop) {
+            [$fqmn, $param] = explode(self::KEY_SEPARATOR, $chain->keys[$index], 2);
+            if ($this->isSuppressedHop($hop, $fqmn, $param)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isSuppressedHop(Hop $hop, string $fqmn, string $param): bool
+    {
+        if ($this->suppressions->suppressesMethod($fqmn) || $this->suppressions->suppressesParam($fqmn, $param)) {
+            return true;
+        }
+
+        if (
+            $this->suppressions->suppressesLine($hop->file, $hop->line)
+            || $this->suppressions->suppressesLine($hop->file, $hop->line - 1)
+        ) {
+            return true;
+        }
+
+        return $hop->forwardLine !== null && $this->suppressions->suppressesLine($hop->file, $hop->forwardLine);
     }
 
     /**

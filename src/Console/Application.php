@@ -6,13 +6,17 @@ namespace PhpTramp\Console;
 
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
+use PhpTramp\Config\ConfigException;
+use PhpTramp\Config\ConfigLoader;
 use PhpTramp\Discovery\FileLocator;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
-use PhpTramp\Report\TextReporter;
+use PhpTramp\Report\ReporterFactory;
+use PhpTramp\Report\Severity;
+use PhpTramp\Report\Thresholds;
 use PhpTramp\Resolve\CallResolver;
 use PhpTramp\Resolve\ClassHierarchy;
 
@@ -45,8 +49,9 @@ final class Application
         $args = array_slice($argv, 1);
 
         try {
-            $options = (new ArgvParser())->parse($args);
-        } catch (InvalidArgsException $e) {
+            $defaults = (new ConfigLoader())->load($this->workingDirectory());
+            $options = (new ArgvParser())->parse($args, $defaults);
+        } catch (ConfigException | InvalidArgsException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
@@ -71,31 +76,46 @@ final class Application
         return $this->analyze($options);
     }
 
+    private function workingDirectory(): string
+    {
+        return getcwd() ?: '.';
+    }
+
     private function analyze(Options $options): int
     {
-        if ($options->format !== 'text') {
-            fwrite($this->stderr, "phptramp: format '{$options->format}' is not implemented until Phase 3.\n");
-
-            return 2;
-        }
-
         try {
+            $thresholds = new Thresholds($options->limit, $options->warnLimit);
             $index = $this->buildIndex($options);
+            $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
         }
 
-        $findings = $this->findChains($index, $options->limit);
-        fwrite($this->stdout, (new TextReporter($options->limit, $options->explain))->render($findings));
+        $findings = $this->findChains($index);
+        fwrite($this->stdout, $reporter->render($findings));
 
-        return $findings === [] ? 0 : 1;
+        return $this->hasError($findings, $thresholds) ? 1 : 0;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     */
+    private function hasError(array $findings, Thresholds $thresholds): bool
+    {
+        foreach ($findings as $finding) {
+            if ($thresholds->severityOf($finding) === Severity::Error) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function buildIndex(Options $options): MethodIndex
     {
-        $files = (new FileLocator())->locate($options);
+        $files = (new FileLocator($this->workingDirectory()))->locate($options);
 
         return (new Indexer())->index($files);
     }
@@ -103,18 +123,17 @@ final class Application
     /**
      * @return list<Finding>
      */
-    private function findChains(MethodIndex $index, int $limit): array
+    private function findChains(MethodIndex $index): array
     {
         $resolver = new CallResolver($index, new ClassHierarchy($index));
-        $findings = (new ChainBuilder($resolver))->build($index);
 
-        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->hops >= $limit));
+        return (new ChainBuilder($resolver))->build($index);
     }
 
     private function dumpIndex(Options $options): int
     {
         try {
-            $files = (new FileLocator())->locate($options);
+            $files = (new FileLocator($this->workingDirectory()))->locate($options);
             $index = (new Indexer())->index($files);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
@@ -201,8 +220,10 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 2 - cross-file chain reporting works in the text format;
-            other formats land in Phase 3. See docs/plan.md.
+            Status: Phase 3 - cross-file chain reporting works across all six
+            formats (text/json/github/checkstyle/sarif/summary). phptramp.json
+            config, #[TrampIgnore]/phptramp-ignore suppression, and --warn-limit
+            are wired up. See docs/plan.md.
 
             TXT;
     }

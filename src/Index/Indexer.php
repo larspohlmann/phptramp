@@ -46,7 +46,11 @@ final class Indexer
             throw new ParseException("parse errors:\n" . implode("\n", $errors));
         }
 
-        return new MethodIndex($this->classifyPending($visitor->pending()), $visitor->classes());
+        return new MethodIndex(
+            $this->classifyPending($visitor->pending()),
+            $visitor->classes(),
+            $visitor->suppressions(),
+        );
     }
 
     /**
@@ -95,6 +99,7 @@ final class Indexer
         }
 
         $visitor->setFile($file);
+        $visitor->recordIgnoreComments($code);
         $traverser->traverse($ast);
 
         return null;

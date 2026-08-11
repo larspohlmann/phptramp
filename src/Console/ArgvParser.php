@@ -50,13 +50,16 @@ final class ArgvParser
     private bool $dumpIndex = false;
     private bool $help = false;
     private bool $version = false;
+    private bool $clearedSeededPaths = false;
+    /** @var list<string> */
+    private array $exclude = [];
 
     /**
      * @param list<string> $args
      */
-    public function parse(array $args): Options
+    public function parse(array $args, Options $defaults = new Options()): Options
     {
-        $this->reset();
+        $this->reset($defaults);
 
         $index = 0;
         $count = count($args);
@@ -78,24 +81,27 @@ final class ArgvParser
             dumpIndex: $this->dumpIndex,
             help: $this->help,
             version: $this->version,
+            exclude: $this->exclude,
         );
     }
 
-    private function reset(): void
+    private function reset(Options $defaults): void
     {
-        $this->folders = [];
-        $this->files = [];
-        $this->limit = 3;
-        $this->warnLimit = null;
-        $this->format = 'text';
-        $this->explain = false;
-        $this->changedOnly = false;
-        $this->gitBase = 'origin/main';
-        $this->baseline = null;
-        $this->generateBaseline = null;
-        $this->dumpIndex = false;
-        $this->help = false;
-        $this->version = false;
+        $this->folders = $defaults->folders;
+        $this->files = $defaults->files;
+        $this->limit = $defaults->limit;
+        $this->warnLimit = $defaults->warnLimit;
+        $this->format = $defaults->format;
+        $this->explain = $defaults->explain;
+        $this->changedOnly = $defaults->changedOnly;
+        $this->gitBase = $defaults->gitBase;
+        $this->baseline = $defaults->baseline;
+        $this->generateBaseline = $defaults->generateBaseline;
+        $this->dumpIndex = $defaults->dumpIndex;
+        $this->help = $defaults->help;
+        $this->version = $defaults->version;
+        $this->exclude = $defaults->exclude;
+        $this->clearedSeededPaths = false;
     }
 
     /**
@@ -134,8 +140,8 @@ final class ArgvParser
     private function applyValueFlag(string $name, string $value): void
     {
         match ($name) {
-            '--folder' => $this->folders[] = $value,
-            '--file' => $this->files[] = $value,
+            '--folder' => $this->appendFolder($value),
+            '--file' => $this->appendFile($value),
             '--files' => $this->appendFiles($value),
             '--limit' => $this->limit = $this->toInt($name, $value),
             '--warn-limit' => $this->warnLimit = $this->toInt($name, $value),
@@ -159,11 +165,39 @@ final class ArgvParser
         };
     }
 
+    private function appendFolder(string $value): void
+    {
+        $this->clearSeededPathsOnce();
+        $this->folders[] = $value;
+    }
+
+    private function appendFile(string $value): void
+    {
+        $this->clearSeededPathsOnce();
+        $this->files[] = $value;
+    }
+
     private function appendFiles(string $value): void
     {
+        $this->clearSeededPathsOnce();
         foreach (explode(',', $value) as $file) {
             $this->files[] = $file;
         }
+    }
+
+    /**
+     * The first path flag replaces config-seeded paths entirely (never mixed
+     * with CLI paths); later path flags append as usual.
+     */
+    private function clearSeededPathsOnce(): void
+    {
+        if ($this->clearedSeededPaths) {
+            return;
+        }
+
+        $this->folders = [];
+        $this->files = [];
+        $this->clearedSeededPaths = true;
     }
 
     private function toInt(string $flag, string $value): int
