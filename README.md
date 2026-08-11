@@ -4,10 +4,11 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 2.** Cross-file chain reporting works: `phptramp --folder src`
-stitches forwarding chains across files and prints text findings, exiting `0`/`1`/`2`.
-The classifier and whole-project index remain inspectable via `--dump-index`; other
-output formats (`json`, `github`, …) land in Phase 3.
+**Status: Phase 3.** Cross-file chain reporting works: `phptramp --folder src`
+stitches forwarding chains across files and prints findings in any of six formats,
+exiting `0`/`1`/`2`. A `phptramp.json` config file, `#[TrampIgnore]`/
+`// phptramp-ignore` suppression, and a `--warn-limit` warning tier are all wired
+up. The classifier and whole-project index remain inspectable via `--dump-index`.
 See [docs/plan.md](docs/plan.md) for the full implementation plan and current phase.
 
 ## What it does
@@ -55,10 +56,14 @@ Add a script to your project's `composer.json` to invoke it the short way:
 
 ```bash
 composer tramp
-composer tramp -- --changed-only --git-base origin/main
+composer tramp -- --format json --warn-limit 2
 ```
 
-## Planned CLI
+phptramp itself does not ship a `composer.json` script of this name — `vendor/bin/phptramp`
+(or `bin/phptramp` inside this repo) is the invocation; the snippet above is a convenience
+you add to a *consuming* project.
+
+## CLI
 
 ```text
 phptramp [options]
@@ -68,17 +73,77 @@ phptramp [options]
   --files <a,b,c>           Comma-separated list of files
   --limit <n>               Fail on chains with >= n pass-through hops (default: 3)
   --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
-  --format <fmt>            text|json|github|checkstyle|sarif (default: text)
+  --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
   --explain                 Show why chains ended (call resolution trace)
-  --changed-only            Only report chains touching changed lines
-  --git-base <ref>          Diff base for --changed-only (default: origin/main)
-  --baseline <file>         Ignore findings recorded in the baseline
-  --generate-baseline <f>   Write current findings to a baseline file
+  --changed-only            Reserved for diff-aware mode (Phase 4) — accepted, not yet wired up
+  --git-base <ref>          Reserved for diff-aware mode (Phase 4) — accepted, not yet wired up
+  --baseline <file>         Reserved for baselining (Phase 5) — accepted, not yet wired up
+  --generate-baseline <f>   Reserved for baselining (Phase 5) — accepted, not yet wired up
 ```
 
-Exit codes: `0` no findings, `1` findings at/over `--limit`, `2` tool error —
-so it drops straight into any CI pipeline. Configuration lives in `phptramp.json`
-(or `phptramp.dist.json`); CLI flags override config.
+Exit codes: `0` no finding at error severity, `1` at least one finding at/over
+`--limit`, `2` tool error — so it drops straight into any CI pipeline.
+
+## Configuration
+
+phptramp reads `phptramp.json` (falling back to `phptramp.dist.json`) from the current
+working directory. CLI flags always take precedence over the config file. An unknown
+key, or a value of the wrong type, is a config error rather than a silently ignored typo.
+
+```json
+{
+    "paths": ["src"],
+    "exclude": ["src/Legacy/*.php"],
+    "limit": 3,
+    "warnLimit": 2,
+    "format": "json"
+}
+```
+
+| Key | Type | Same as |
+|---|---|---|
+| `paths` | list of strings | entries ending in `.php` become `--file`s, everything else a `--folder` |
+| `exclude` | list of strings | `fnmatch` globs matched against each folder-discovered file's path, relative to the config file's directory; explicit files (`paths` entries ending in `.php`) are never excluded |
+| `limit` | integer | `--limit` |
+| `warnLimit` | integer | `--warn-limit` |
+| `format` | string | `--format` |
+| `baseline` | string | `--baseline` (reserved for Phase 5) |
+
+## Output formats
+
+`--format` selects the renderer; all six are implemented and covered by an exact-string
+test plus a fixture.
+
+| Format | One-line example |
+|---|---|
+| `text` | `FINDING  $config: 3 pass-through hops across 4 classes` |
+| `json` | `{"limit":3,"warnLimit":null,"findings":[{"param":"config","severity":"error","hops":3,...}]}` |
+| `github` | `::error file=src/Demo.php,line=12,title=phptramp::$config: 3 pass-through hops across 4 classes (terminal: Demo\Mailer::__construct [stored])` |
+| `checkstyle` | `<error line="12" severity="error" message="$config: 3 pass-through hops across 4 classes (terminal: Demo\Mailer::__construct [stored])" source="phptramp.trampData"/>` |
+| `sarif` | `{"ruleId":"phptramp.trampData","level":"error","message":{"text":"$config: 3 pass-through hops across 4 classes (terminal: Demo\\Mailer::__construct [stored])"}}` |
+| `summary` | `12 chains total; 5 at or over the limit (limit: 3 hops).` |
+
+## Suppression
+
+Mark a specific false positive as intentional instead of raising `--limit` project-wide:
+
+- **`#[TrampIgnore]`** on a class, method, function, or parameter. Matching is by the
+  attribute name's *short name*, so an analyzed codebase never has to `require` or
+  autoload phptramp's own `PhpTramp\Ignore\TrampIgnore` class to use it.
+- **`// phptramp-ignore`** as a real PHP comment (a marker inside a string literal does
+  not count) on a hop's declaration line, the line directly above it, or a forwarding
+  call-site line.
+
+Either drops the *entire chain* passing through that hop, not just the one parameter
+reaching the flagged declaration.
+
+## `--warn-limit`
+
+`--warn-limit <n>` adds a second, lower threshold below `--limit`. Chains whose hop
+count falls in `[warn-limit, limit)` render at `severity: "warning"` (`WARNING` in text,
+`::warning` in the GitHub format, `"level": "warning"` in SARIF, …) but never fail the
+run — only chains at or over `--limit` set exit code `1`. Useful for tightening a hop
+budget gradually: warn today, promote to a hard failure once the codebase is clean.
 
 ## IDE integration
 

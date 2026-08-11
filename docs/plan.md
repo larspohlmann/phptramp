@@ -680,7 +680,7 @@ Tasks (expanded in `docs/plans/phase-2.md`):
 
 ---
 
-## Phase 3 — CI & config surface  (in progress — issue #5)
+## Phase 3 — CI & config surface  ✅ (issue #5)
 
 **Deliverable:** all output formats, config file, suppression, dual thresholds, summary.
 
@@ -690,21 +690,25 @@ against the actual Phase 1–2 interfaces; where it refines the sketches below (
 parser-default seeding, suppression exposed through `MethodIndex::suppressions()`),
 the detailed plan wins.
 
-- **3.1 ConfigLoader:** `phptramp.json` then `phptramp.dist.json`; keys `paths`,
+- [x] **3.1 ConfigLoader:** `phptramp.json` then `phptramp.dist.json`; keys `paths`,
   `exclude`, `limit`, `warnLimit`, `format`, `baseline`; strict unknown-key error;
   precedence CLI > config > defaults (merge into `Options`). `exclude` glob patterns
   feed FileLocator.
-- **3.2 Formats:** `JsonReporter` (the `expected.json` schema — one schema everywhere),
+- [x] **3.2 Formats:** `JsonReporter` (the `expected.json` schema — one schema everywhere),
   `GithubReporter` (`::error file=...,line=...::...` per origin, `::notice` per hop),
   `CheckstyleReporter`, `SarifReporter` (rule id `phptramp.trampData`). Fixtures assert
   each format byte-for-byte.
-- **3.3 Suppression:** `#[TrampIgnore]` attribute class + `// phptramp-ignore` comments
+- [x] **3.3 Suppression:** `#[TrampIgnore]` attribute class + `// phptramp-ignore` comments
   scanned during indexing into a `SuppressionIndex`; ChainBuilder drops chains with any
   suppressed hop (frozen rule 11).
-- **3.4 Dual thresholds:** `--warn-limit` — findings in `[warn, limit)` render as
+- [x] **3.4 Dual thresholds:** `--warn-limit` — findings in `[warn, limit)` render as
   warnings, never affect exit code. GitHub format uses `::warning`.
-- **3.5 SummaryReporter:** `--format=summary` — histogram of chain lengths, top 10
+- [x] **3.5 SummaryReporter:** `--format=summary` — histogram of chain lengths, top 10
   longest chains, most-forwarded parameters.
+
+`--changed-only`/`--git-base` (Phase 4) and `--baseline`/`--generate-baseline` (Phase 5)
+remain accepted-but-inert CLI flags — parsed into `Options` for forward compatibility,
+not yet consumed by analysis. Not a Phase 3 deliverable; tracked in their own phases.
 
 ---
 

@@ -221,8 +221,10 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 2 - cross-file chain reporting works in the text format;
-            other formats land in Phase 3. See docs/plan.md.
+            Status: Phase 3 - cross-file chain reporting works across all six
+            formats (text/json/github/checkstyle/sarif/summary). phptramp.json
+            config, #[TrampIgnore]/phptramp-ignore suppression, and --warn-limit
+            are wired up. See docs/plan.md.
 
             TXT;
     }
