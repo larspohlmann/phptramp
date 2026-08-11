@@ -89,29 +89,25 @@ final class GithubReporter implements Reporter
      */
     private function subsequentHops(Finding $finding): array
     {
-        $hops = [];
-        for ($index = 1; $index < $finding->hops; $index++) {
-            $hops[$index] = $finding->chain[$index];
-        }
-
-        return $hops;
+        return array_slice($finding->chain, 1, $finding->hops - 1, true);
     }
 
     /**
      * Escapes a workflow-command PROPERTY value (a `file=`/`title=` component),
      * per `@actions/core`'s `escapeProperty`: the same %/\r/\n data-escaping as
      * a command's message body, plus `:` and `,` — the two characters that
-     * would otherwise be misread as property separators. `%` must be escaped
-     * first, or the `%3A`/`%2C`/`%0D`/`%0A` sequences introduced below would
-     * themselves get re-escaped.
+     * would otherwise be misread as property separators. `strtr` replaces every
+     * character in a single left-to-right pass, so the `%NN` sequences it
+     * introduces are never themselves re-escaped.
      */
     private function escapeProperty(string $value): string
     {
-        $value = str_replace('%', '%25', $value);
-        $value = str_replace(':', '%3A', $value);
-        $value = str_replace(',', '%2C', $value);
-        $value = str_replace("\r", '%0D', $value);
-
-        return str_replace("\n", '%0A', $value);
+        return strtr($value, [
+            '%' => '%25',
+            ':' => '%3A',
+            ',' => '%2C',
+            "\r" => '%0D',
+            "\n" => '%0A',
+        ]);
     }
 }
