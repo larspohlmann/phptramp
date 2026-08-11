@@ -77,7 +77,7 @@ final class Application
     {
         try {
             $index = $this->buildIndex($options);
-            $reporter = (new ReporterFactory())->create($options);
+            $reporter = (new ReporterFactory(getcwd() ?: '.'))->create($options);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 

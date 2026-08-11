@@ -9,12 +9,17 @@ use PhpTramp\Console\Options;
 
 final class ReporterFactory
 {
+    public function __construct(private readonly string $workingDirectory)
+    {
+    }
+
     public function create(Options $options): Reporter
     {
         $thresholds = new Thresholds($options->limit, $options->warnLimit);
 
         return match ($options->format) {
             'text' => new TextReporter($thresholds, $options->explain),
+            'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory)),
             default => throw new InvalidArgsException("format '{$options->format}' is not implemented yet."),
         };
     }

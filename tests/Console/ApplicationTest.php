@@ -101,9 +101,20 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'json']));
+        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'sarif']));
         self::assertStringContainsString('not implemented', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
+    }
+
+    public function testJsonFormatReportsFindingsAndExitsOne(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--format', 'json']));
+
+        $output = self::contents($this->stdout);
+        self::assertStringContainsString('"findings"', $output);
+        self::assertStringContainsString('"severity": "error"', $output);
     }
 
     public function testWarnOnlyRunExitsZeroButPrintsWarning(): void
