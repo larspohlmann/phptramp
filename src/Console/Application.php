@@ -6,6 +6,8 @@ namespace PhpTramp\Console;
 
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
+use PhpTramp\Config\ConfigException;
+use PhpTramp\Config\ConfigLoader;
 use PhpTramp\Discovery\FileLocator;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
@@ -47,8 +49,9 @@ final class Application
         $args = array_slice($argv, 1);
 
         try {
-            $options = (new ArgvParser())->parse($args);
-        } catch (InvalidArgsException $e) {
+            $defaults = (new ConfigLoader())->load($this->workingDirectory());
+            $options = (new ArgvParser())->parse($args, $defaults);
+        } catch (ConfigException | InvalidArgsException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
@@ -73,11 +76,16 @@ final class Application
         return $this->analyze($options);
     }
 
+    private function workingDirectory(): string
+    {
+        return getcwd() ?: '.';
+    }
+
     private function analyze(Options $options): int
     {
         try {
             $index = $this->buildIndex($options);
-            $reporter = (new ReporterFactory(getcwd() ?: '.'))->create($options);
+            $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 

@@ -173,4 +173,74 @@ final class ArgvParserTest extends TestCase
             self::assertStringContainsString('--limit', $e->getMessage());
         }
     }
+
+    public function testSeededDefaultSurvivesWhenFlagAbsent(): void
+    {
+        $defaults = new Options(limit: 1);
+
+        self::assertSame(1, (new ArgvParser())->parse([], $defaults)->limit);
+    }
+
+    public function testExplicitFlagOverridesSeededDefault(): void
+    {
+        $defaults = new Options(limit: 1);
+
+        self::assertSame(5, (new ArgvParser())->parse(['--limit', '5'], $defaults)->limit);
+    }
+
+    public function testFirstPathFlagClearsSeededPaths(): void
+    {
+        $defaults = new Options(folders: ['configdir'], files: ['configfile.php']);
+
+        $options = (new ArgvParser())->parse(['--folder', 'cli'], $defaults);
+
+        self::assertSame(['cli'], $options->folders);
+        self::assertSame([], $options->files);
+    }
+
+    public function testSecondPathFlagAppendsRatherThanClearing(): void
+    {
+        $defaults = new Options(folders: ['configdir']);
+
+        $options = (new ArgvParser())->parse(['--folder', 'a', '--folder', 'b'], $defaults);
+
+        self::assertSame(['a', 'b'], $options->folders);
+    }
+
+    public function testFileFlagClearsSeededPaths(): void
+    {
+        $defaults = new Options(folders: ['configdir'], files: ['configfile.php']);
+
+        $options = (new ArgvParser())->parse(['--file', 'cli.php'], $defaults);
+
+        self::assertSame([], $options->folders);
+        self::assertSame(['cli.php'], $options->files);
+    }
+
+    public function testFilesFlagClearsSeededPaths(): void
+    {
+        $defaults = new Options(folders: ['configdir'], files: ['configfile.php']);
+
+        $options = (new ArgvParser())->parse(['--files', 'a.php,b.php'], $defaults);
+
+        self::assertSame([], $options->folders);
+        self::assertSame(['a.php', 'b.php'], $options->files);
+    }
+
+    public function testUnknownFlagWithEqualsSyntaxThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--nope=value');
+    }
+
+    public function testSeededNonPathDefaultsSurviveAlongsideExplicitFlags(): void
+    {
+        $defaults = new Options(format: 'json', gitBase: 'develop');
+
+        $options = (new ArgvParser())->parse(['--limit', '5'], $defaults);
+
+        self::assertSame('json', $options->format);
+        self::assertSame('develop', $options->gitBase);
+        self::assertSame(5, $options->limit);
+    }
 }
