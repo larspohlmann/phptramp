@@ -13,6 +13,7 @@ use PhpTramp\Diff\DiffException;
 use PhpTramp\Diff\DiffParser;
 use PhpTramp\Diff\GitDiffRunner;
 use PhpTramp\Discovery\FileLocator;
+use PhpTramp\Ignore\SuppressionFilter;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
@@ -127,7 +128,10 @@ final class Application
             $thresholds = new Thresholds($options->limit, $options->warnLimit);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
-            $findings = $this->changedOnlyFindings($this->findChains($index), $options);
+            $findings = $this->suppressedFindings(
+                $this->changedOnlyFindings($this->findChains($index), $options),
+                $index,
+            );
         } catch (InvalidArgsException | ParseException | DiffException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
@@ -153,6 +157,19 @@ final class Application
             ->resolveAgainst($this->workingDirectory());
 
         return (new ChangedChainFilter($changedLines))->filter($findings);
+    }
+
+    /**
+     * Suppression applies in both full-scan and diff-aware modes, so it runs
+     * unconditionally after the changed-only filter. The fired keys are not
+     * consumed yet — Task 6 wires them into stale-ignore reporting.
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function suppressedFindings(array $findings, MethodIndex $index): array
+    {
+        return (new SuppressionFilter($index->suppressions()))->filter($findings)->kept;
     }
 
     private function acquireDiffText(Options $options): string

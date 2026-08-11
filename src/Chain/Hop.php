@@ -7,7 +7,8 @@ namespace PhpTramp\Chain;
 /**
  * One node of a reported chain: the method it lands in and the source location,
  * plus the line of the forwarding call site it leaves through (null on the
- * terminal node, which forwards nowhere).
+ * terminal node, which forwards nowhere), and the node's own parameter name —
+ * which the suppression filter matches `#[TrampIgnore]` param entries against.
  */
 final class Hop
 {
@@ -20,6 +21,8 @@ final class Hop
         public readonly ?int $forwardLine,
         /** Whether this hop intersects the diff in diff-aware mode. */
         public readonly bool $changed = false,
+        /** This hop's own parameter name; used for per-hop suppression lookup. */
+        public readonly string $param = '',
     ) {
     }
 
@@ -29,6 +32,14 @@ final class Hop
      */
     public function withChanged(bool $changed): self
     {
-        return new self($this->fqmn, $this->class, $this->file, $this->line, $this->forwardLine, $changed);
+        return new self(
+            $this->fqmn,
+            $this->class,
+            $this->file,
+            $this->line,
+            $this->forwardLine,
+            $changed,
+            $this->param,
+        );
     }
 }
