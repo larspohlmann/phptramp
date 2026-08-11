@@ -201,6 +201,40 @@ final class SuppressionFilterTest extends TestCase
         self::assertContains(SuppressionIndex::methodKey('Demo\B::step'), $outcome->firedKeys);
     }
 
+    public function testAttributeOnTheTerminalMethodDoesNotSuppressTheChain(): void
+    {
+        // The terminal node is not a hop and never participates in suppression
+        // (frozen rule 11; matches ChangedChainFilter's `forwardLine === null`
+        // skip). A `#[TrampIgnore]` on the terminal method must leave the
+        // finding reported, and its method key must not appear in firedKeys.
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->step($p); } } '
+            . 'class B { public function step(Cfg $p): void { (new C())->sink($p); } } '
+            . 'class C { #[TrampIgnore] public function sink(Cfg $p): void { $p->x(); } }';
+
+        $outcome = $this->buildOutcome($code);
+        self::assertCount(1, $outcome->kept);
+        self::assertSame('Demo\C::sink', $outcome->kept[0]->terminal);
+        self::assertNotContains(SuppressionIndex::methodKey('Demo\C::sink'), $outcome->firedKeys);
+        self::assertSame([], $outcome->firedKeys);
+    }
+
+    public function testIgnoreCommentOnTheTerminalDeclarationLineDoesNotSuppressTheChain(): void
+    {
+        // Same rule, line-based: a `// phptramp-ignore` on the terminal's own
+        // declaration line must not drop the chain. The comment is on C::sink's
+        // declaration line; the finding stays.
+        $code = "<?php namespace Demo; class Cfg {}\n"
+            . "class A { public function go(Cfg \$p): void { (new B())->step(\$p); } }\n"
+            . "class B { public function step(Cfg \$p): void { (new C())->sink(\$p); } }\n"
+            . "class C { public function sink(Cfg \$p): void { \$p->x(); } } // phptramp-ignore\n";
+
+        $outcome = $this->buildOutcome($code);
+        self::assertCount(1, $outcome->kept);
+        self::assertSame('Demo\C::sink', $outcome->kept[0]->terminal);
+        self::assertSame([], $outcome->firedKeys);
+    }
+
     public function testFiredKeysAreDeduplicatedInFirstFiredOrder(): void
     {
         // Two findings both pass through the same suppressed method. The method

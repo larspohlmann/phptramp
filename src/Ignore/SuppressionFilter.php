@@ -59,6 +59,11 @@ final class SuppressionFilter
      * above, forward line). Deduplicated within the finding so a key that
      * matches on multiple hops records once, at its first-fired position.
      *
+     * The terminal hop is skipped: `forwardLine === null` identifies it (the
+     * terminal forwards nowhere), matching the old `ChainTraversal` guard and
+     * the `ChangedChainFilter` precedent. Terminals are not hops and never
+     * suppress.
+     *
      * @return list<string>
      */
     private function matchedKeysFor(Finding $finding): array
@@ -67,6 +72,9 @@ final class SuppressionFilter
         $seen = [];
 
         foreach ($finding->chain as $hop) {
+            if ($hop->forwardLine === null) {
+                continue;
+            }
             foreach ($this->matchedKeysForHop($hop) as $key) {
                 if (isset($seen[$key])) {
                     continue;

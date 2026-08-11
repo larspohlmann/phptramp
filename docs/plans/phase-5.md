@@ -240,9 +240,9 @@ final class SuppressionFilter
 ```
 
 Semantics to preserve **exactly** (from `ChainTraversal::isSuppressedHop`):
-a finding is dropped when any chain hop (terminal node included — it is in the
-chain for kinds that keep it, and the current code checks every `PartialChain`
-hop; verify against the moved tests, not from memory) matches by: suppressed
+a finding is dropped when any chain hop (the terminal node is skipped —
+terminals are not hops and never suppress; the current code checks every
+`PartialChain` hop, which excludes the terminal) matches by: suppressed
 method FQMN, suppressed (FQMN, chain param), or a suppressed line that is the
 hop's declaration line, the line directly above it, or its `forwardLine`.
 `firedKeys` records every key that contributed to at least one drop,
