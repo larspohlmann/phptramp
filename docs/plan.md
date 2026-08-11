@@ -712,10 +712,18 @@ not yet consumed by analysis. Not a Phase 3 deliverable; tracked in their own ph
 
 ---
 
-## Phase 4 — Diff-aware mode (flagship)
+## Phase 4 — Diff-aware mode (flagship)  (in progress — issue #7)
 
 **Deliverable:** `phptramp --changed-only --git-base origin/main` reports only chains
 intersecting the diff and marks which hops are the user's.
+
+**Detailed step-by-step plan: [docs/plans/phase-4.md](plans/phase-4.md)** — written
+against the shipped Phase 1–3 interfaces; where it refines the sketches below
+(diff via `--diff <path|->` instead of a positional `-`, a `--no-config` escape
+hatch, marking via immutable Finding rebuild), the detailed plan wins. Two items
+are pulled forward into this phase at the maintainer's request: the repo's own
+`composer tramp` script + `phptramp.dist.json`, and the CI dogfood step becoming a
+real gate (limit 3, warn-limit 2 — thresholds measured on the actual tree).
 
 - **4.1 DiffParser + ChangedLines:** parse unified diff from stdin (`--changed-only -`)
   or by executing `git diff --unified=0 <base>...HEAD` (note: three-dot, merge-base
@@ -756,7 +764,7 @@ intersecting the diff and marks which hops are the user's.
   worker count from `nproc`, flag `--jobs`.
 - **6.3 Docs:** PhpStorm External Tool + File Watcher recipe (`docs/phpstorm.md`),
   finalize `docs/ci.md`, README rewrite against the real tool output.
-- **6.4 Release:** dogfood job gating (`--limit 3`, real), Packagist submission, tag
+- **6.4 Release:** (dogfood gating shipped early, in Phase 4) Packagist submission, tag
   `v0.1.0`. Roadmap notes (explicit maybe-laters): `--follow-all-implementations`,
   field/property tramping, native PhpStorm plugin, composer-plugin command package.
 
