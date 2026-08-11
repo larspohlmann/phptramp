@@ -180,6 +180,21 @@ final class ArgvParserTest extends TestCase
         self::assertFalse($this->parse()->noConfig);
     }
 
+    public function testNoCacheFlagSetsNoCache(): void
+    {
+        self::assertTrue($this->parse('--no-cache')->noCache);
+    }
+
+    public function testNoCacheDefaultsToFalse(): void
+    {
+        self::assertFalse($this->parse()->noCache);
+    }
+
+    public function testCacheDirDefaultsToPhpTrampCache(): void
+    {
+        self::assertSame('.phptramp.cache', $this->parse()->cacheDir);
+    }
+
     public function testHelpFlags(): void
     {
         self::assertTrue($this->parse('--help')->help);

@@ -301,7 +301,7 @@ final class Application
     {
         $files = (new FileLocator($this->workingDirectory()))->locate($options);
 
-        return (new Indexer())->index($files);
+        return (new IndexerFactory())->fromOptions($options)->index($files);
     }
 
     /**
@@ -318,7 +318,7 @@ final class Application
     {
         try {
             $files = (new FileLocator($this->workingDirectory()))->locate($options);
-            $index = (new Indexer())->index($files);
+            $index = (new IndexerFactory())->fromOptions($options)->index($files);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 

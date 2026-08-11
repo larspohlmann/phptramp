@@ -203,4 +203,22 @@ final class ConfigLoaderTest extends TestCase
 
         self::assertSame(2, $options->warnLimit);
     }
+
+    public function testCacheKeyIsMapped(): void
+    {
+        $this->writeConfig('phptramp.json', '{"cache": "build/tramp-cache"}');
+
+        $options = (new ConfigLoader())->load($this->directory);
+
+        self::assertSame('build/tramp-cache', $options->cacheDir);
+    }
+
+    public function testWrongTypeForCacheThrows(): void
+    {
+        $this->writeConfig('phptramp.json', '{"cache": 5}');
+
+        $this->expectException(ConfigException::class);
+
+        (new ConfigLoader())->load($this->directory);
+    }
 }

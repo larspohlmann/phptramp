@@ -19,6 +19,7 @@ final class BoolFlags
         public bool $help = false,
         public bool $version = false,
         public bool $failOnStale = false,
+        public bool $noCache = false,
     ) {
     }
 }

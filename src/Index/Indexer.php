@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Index;
 
+use PhpTramp\Cache\FileIndexCache;
 use PhpTramp\Ignore\SuppressionIndex;
 
 /**
@@ -14,12 +15,18 @@ use PhpTramp\Ignore\SuppressionIndex;
  * duplicate FQMN/FQCN keys, suppression parts are concatenated — so the
  * resulting index is byte-identical to the pre-refactor output.
  *
+ * When a {@see FileIndexCache} is injected, each file is served from the cache
+ * on a hit (skipping the parse) and written back on a miss. Cache transparency
+ * is total: the cache never changes the merged result, never throws, and a
+ * cached entry is invalidated by mtime/size so an edited file always re-parses.
+ *
  * @phpstan-import-type PendingMethod from IndexingVisitor
  */
 final class Indexer
 {
     public function __construct(
         private readonly FileIndexer $fileIndexer = new FileIndexer(),
+        private readonly ?FileIndexCache $cache = null,
     ) {
     }
 
@@ -44,7 +51,7 @@ final class Indexer
 
         foreach ($files as $file) {
             try {
-                $fileIndex = $this->fileIndexer->index($file);
+                $fileIndex = $this->indexFile($file);
             } catch (ParseException $e) {
                 $errors[] = $e->getMessage();
                 continue;
@@ -66,5 +73,27 @@ final class Indexer
             $mergedClasses,
             new SuppressionIndex($suppressedMethods, $suppressedParams, $suppressedLines),
         );
+    }
+
+    /**
+     * Returns the cached {@see FileIndex} on a hit, otherwise parses fresh
+     * and stores the result for next time. A null cache means uncached, which
+     * is the default so every existing `new Indexer()` call site is unaffected.
+     */
+    private function indexFile(string $file): FileIndex
+    {
+        if ($this->cache === null) {
+            return $this->fileIndexer->index($file);
+        }
+
+        $cached = $this->cache->get($file);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $fileIndex = $this->fileIndexer->index($file);
+        $this->cache->put($file, $fileIndex);
+
+        return $fileIndex;
     }
 }

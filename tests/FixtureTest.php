@@ -126,7 +126,7 @@ final class FixtureTest extends TestCase
     private function runFolderMode(string $caseDir): array
     {
         $argv = [
-            'phptramp', '--folder', $caseDir . '/src', '--no-config', '--format', 'json',
+            'phptramp', '--folder', $caseDir . '/src', '--no-config', '--no-cache', '--format', 'json',
             ...$this->extraCliArgs($caseDir),
         ];
         [$exitCode, $decoded] = $this->runApplication($argv);
@@ -139,7 +139,9 @@ final class FixtureTest extends TestCase
      * supplies paths/exclude/limit, then run with no `--folder` at all. Always
      * restores the previous cwd — other tests depend on it. Findings' `file`
      * values come out already fixture-relative (cwd = fixture dir at render
-     * time), so no prefix-strip is needed.
+     * time), so no prefix-strip is needed. `--no-cache` keeps fixtures
+     * hermetic: they pin findings semantics, not cache behavior, and must not
+     * litter a `.phptramp.cache/` into the committed fixture directory.
      *
      * @return array{0: int, 1: array<string, mixed>}
      */
@@ -151,7 +153,7 @@ final class FixtureTest extends TestCase
         try {
             self::assertTrue(chdir($caseDir));
 
-            return $this->runApplication(['phptramp', '--format', 'json']);
+            return $this->runApplication(['phptramp', '--no-cache', '--format', 'json']);
         } finally {
             chdir($previousCwd);
         }
@@ -271,7 +273,7 @@ final class FixtureTest extends TestCase
         self::assertIsResource($stderr);
 
         $exit = (new Application($stdout, $stderr))->run(
-            ['phptramp', '--folder', $srcDir, '--no-config', '--dump-index'],
+            ['phptramp', '--folder', $srcDir, '--no-config', '--no-cache', '--dump-index'],
         );
         self::assertSame(0, $exit);
 

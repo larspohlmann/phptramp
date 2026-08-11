@@ -41,6 +41,7 @@ final class ArgvParser
         '--version',
         '-V',
         '--fail-on-stale',
+        '--no-cache',
     ];
 
     private const VALID_FORMATS = ['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'];
@@ -59,6 +60,7 @@ final class ArgvParser
     private bool $clearedSeededPaths = false;
     /** @var list<string> */
     private array $exclude = [];
+    private string $cacheDir = '.phptramp.cache';
 
     /**
      * @param list<string> $args
@@ -91,6 +93,8 @@ final class ArgvParser
             version: $this->bools->version,
             failOnStale: $this->bools->failOnStale,
             exclude: $this->exclude,
+            noCache: $this->bools->noCache,
+            cacheDir: $this->cacheDir,
         );
     }
 
@@ -109,10 +113,12 @@ final class ArgvParser
             help: $defaults->help,
             version: $defaults->version,
             failOnStale: $defaults->failOnStale,
+            noCache: $defaults->noCache,
         );
         $this->baseline = $defaults->baseline;
         $this->generateBaseline = $defaults->generateBaseline;
         $this->exclude = $defaults->exclude;
+        $this->cacheDir = $defaults->cacheDir;
         $this->clearedSeededPaths = false;
     }
 
@@ -176,6 +182,7 @@ final class ArgvParser
             '--help', '-h' => $this->bools->help = true,
             '--version', '-V' => $this->bools->version = true,
             '--fail-on-stale' => $this->bools->failOnStale = true,
+            '--no-cache' => $this->bools->noCache = true,
             default => throw new InvalidArgsException("unknown option: {$name}"),
         };
     }
