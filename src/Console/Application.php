@@ -133,10 +133,10 @@ final class Application
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
-            $findings = $this->suppressedFindings(
+            $suppression = (new SuppressionFilter($index->suppressions()))->filter(
                 $this->changedOnlyFindings($this->findChains($index), $options),
-                $index,
             );
+            $findings = $suppression->kept;
         } catch (InvalidArgsException | ParseException | DiffException | BaselineException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
@@ -147,11 +147,21 @@ final class Application
             return $this->generateBaseline($findings, $thresholds, $options->generateBaseline, $options->baseline);
         }
 
+        $staleReporter = new StaleReporter($baseline, $index->suppressions());
+        $staleLines = $staleReporter->lines($options->changedOnly, $findings, $suppression->firedKeys);
+        foreach ($staleLines as $line) {
+            fwrite($this->stderr, $line . "\n");
+        }
+
         $findings = $baselineFilter->exclude($findings, $baseline);
 
         fwrite($this->stdout, $reporter->render($findings));
 
-        return $this->hasError($findings, $thresholds) ? 1 : 0;
+        return $staleReporter->exitCode(
+            $this->hasError($findings, $thresholds),
+            $options->failOnStale,
+            $staleLines,
+        );
     }
 
     /**
@@ -238,19 +248,6 @@ final class Application
             ->resolveAgainst($this->workingDirectory());
 
         return (new ChangedChainFilter($changedLines))->filter($findings);
-    }
-
-    /**
-     * Suppression applies in both full-scan and diff-aware modes, so it runs
-     * unconditionally after the changed-only filter. The fired keys are not
-     * consumed yet — Task 6 wires them into stale-ignore reporting.
-     *
-     * @param list<Finding> $findings
-     * @return list<Finding>
-     */
-    private function suppressedFindings(array $findings, MethodIndex $index): array
-    {
-        return (new SuppressionFilter($index->suppressions()))->filter($findings)->kept;
     }
 
     private function acquireDiffText(Options $options): string

@@ -35,6 +35,7 @@ final class Options
         public readonly bool $noConfig = false,
         public readonly bool $help = false,
         public readonly bool $version = false,
+        public readonly bool $failOnStale = false,
         public readonly array $exclude = [],
     ) {
     }

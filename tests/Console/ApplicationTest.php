@@ -511,6 +511,75 @@ final class ApplicationTest extends TestCase
         self::assertStringContainsString('No tramp data found', self::contents($stdout));
     }
 
+    public function testStaleBaselineEntryPrintedToStderrAndExitUnchanged(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $this->baselineWithOneRealAndOneFabricatedEntry($folder);
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+        ]);
+
+        self::assertSame(0, $exitCode);
+        $stderr = self::contents($this->stderr);
+        $staleLines = $this->linesStartingWith($stderr, 'phptramp: stale baseline entry:');
+        self::assertCount(1, $staleLines);
+        self::assertStringContainsString(
+            '0000000000000000000000000000000000000000 fabricated stale entry',
+            $staleLines[0],
+        );
+        self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale suppression:'));
+    }
+
+    public function testStaleBaselineEntryWithFailOnStaleFlipsExitToOne(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $this->baselineWithOneRealAndOneFabricatedEntry($folder);
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--baseline', $baselineFile, '--fail-on-stale',
+        ]);
+
+        self::assertSame(1, $exitCode);
+    }
+
+    public function testUnusedTrampIgnorePrintsStaleSuppressionLineAndExitUnchanged(): void
+    {
+        $folder = $this->fixtureWithChainAndUnusedIgnore();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3',
+        ]);
+
+        // The real chain is reported at limit 3, so the base exit is 1; the
+        // stale suppression line does not change it.
+        self::assertSame(1, $exitCode);
+        $stderr = self::contents($this->stderr);
+        $suppressionLines = $this->linesStartingWith($stderr, 'phptramp: stale suppression:');
+        self::assertCount(1, $suppressionLines);
+        self::assertStringContainsString(
+            'method:Demo\Unused::neverCalled',
+            $suppressionLines[0],
+        );
+        self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale baseline entry:'));
+    }
+
+    public function testChangedOnlySkipsStaleDetectionEntirely(): void
+    {
+        $folder = $this->fixtureWithChainAndUnusedIgnore();
+        $diffFile = $this->writeDiffFile($folder, 'empty.diff', '');
+
+        $exitCode = $this->runInFolder($folder, [
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3',
+            '--changed-only', '--diff', $diffFile, '--fail-on-stale',
+        ]);
+
+        self::assertSame(0, $exitCode);
+        $stderr = self::contents($this->stderr);
+        self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale'));
+    }
+
     /**
      * @param list<string> $argv
      */
@@ -719,5 +788,66 @@ final class ApplicationTest extends TestCase
         file_put_contents($folder . '/Demo.php', $code);
 
         return $folder;
+    }
+
+    /**
+     * A real 3-hop chain plus an unused #[TrampIgnore] method that no chain
+     * passes through — its method-key never fires, so it is a stale
+     * suppression on a full run.
+     */
+    private function fixtureWithChainAndUnusedIgnore(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { public function process(Cfg $config): void { (new ServiceB())->run($config); } } '
+            . 'class ServiceB { public function run(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } } '
+            . 'class Unused { #[TrampIgnore] public function neverCalled(Cfg $p): void { $p->x(); } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
+    }
+
+    /**
+     * Generate the real baseline for the folder's single chain, then append a
+     * fabricated entry whose hash matches no finding — it is the stale one.
+     */
+    private function baselineWithOneRealAndOneFabricatedEntry(string $folder): string
+    {
+        $baselineFile = $folder . '/baseline.json';
+
+        $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+        ]);
+
+        $document = json_decode((string) file_get_contents($baselineFile), true);
+        self::assertIsArray($document);
+        self::assertArrayHasKey('fingerprints', $document);
+        $document['fingerprints'][] = '0000000000000000000000000000000000000000 fabricated stale entry';
+        file_put_contents(
+            $baselineFile,
+            json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
+        );
+
+        return $baselineFile;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function linesStartingWith(string $haystack, string $prefix): array
+    {
+        $matched = [];
+        foreach (explode("\n", $haystack) as $line) {
+            if (str_starts_with($line, $prefix)) {
+                $matched[] = $line;
+            }
+        }
+
+        return $matched;
     }
 }
