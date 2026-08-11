@@ -29,4 +29,26 @@ final class Finding
         public readonly array $trace,
     ) {
     }
+
+    /**
+     * A copy of this finding carrying a rebuilt chain — so callers that only
+     * re-mark hops (the diff filter) need not know this constructor's full
+     * signature.
+     *
+     * @param list<Hop> $chain
+     */
+    public function withChain(array $chain): self
+    {
+        return new self(
+            $this->param,
+            $this->origin,
+            $this->terminal,
+            $this->terminalKind,
+            $this->hops,
+            $chain,
+            $this->classes,
+            $this->notes,
+            $this->trace,
+        );
+    }
 }

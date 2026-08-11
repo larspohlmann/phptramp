@@ -22,4 +22,13 @@ final class Hop
         public readonly bool $changed = false,
     ) {
     }
+
+    /**
+     * A copy of this hop with its diff-aware `changed` mark set — so the
+     * diff filter never has to know this constructor's full signature.
+     */
+    public function withChanged(bool $changed): self
+    {
+        return new self($this->fqmn, $this->class, $this->file, $this->line, $this->forwardLine, $changed);
+    }
 }

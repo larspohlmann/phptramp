@@ -11,6 +11,13 @@ namespace PhpTramp\Console;
  */
 final class ArgvParser
 {
+    /**
+     * Skips config loading. Public because {@see Application} must detect it in
+     * the raw args before parsing (config seeds the parser's defaults), so both
+     * sides share this one spelling.
+     */
+    public const NO_CONFIG_FLAG = '--no-config';
+
     private const VALUE_FLAGS = [
         '--folder',
         '--file',
@@ -28,7 +35,7 @@ final class ArgvParser
         '--explain',
         '--changed-only',
         '--dump-index',
-        '--no-config',
+        self::NO_CONFIG_FLAG,
         '--help',
         '-h',
         '--version',
@@ -164,7 +171,7 @@ final class ArgvParser
             '--explain' => $this->explain = true,
             '--changed-only' => $this->diffAware->changedOnly = true,
             '--dump-index' => $this->dumpIndex = true,
-            '--no-config' => $this->noConfig = true,
+            self::NO_CONFIG_FLAG => $this->noConfig = true,
             '--help', '-h' => $this->help = true,
             '--version', '-V' => $this->version = true,
             default => throw new InvalidArgsException("unknown option: {$name}"),

@@ -109,7 +109,7 @@ final class Application
      */
     private function loadDefaults(array $args): Options
     {
-        if (in_array('--no-config', $args, true)) {
+        if (in_array(ArgvParser::NO_CONFIG_FLAG, $args, true)) {
             return new Options();
         }
 

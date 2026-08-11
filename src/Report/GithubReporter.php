@@ -59,10 +59,12 @@ final class GithubReporter implements Reporter
      */
     private function annotationLines(Finding $finding, Severity $severity): array
     {
-        $anchorIndex = $this->anchorIndex($finding);
+        $nonTerminalHops = $this->nonTerminalHops($finding);
+        $anchorIndex = $this->anchorIndex($nonTerminalHops);
 
         $lines = [$this->anchorAnnotation($finding, $severity, $anchorIndex)];
-        foreach ($this->noticeHops($finding, $anchorIndex) as $index => $hop) {
+        unset($nonTerminalHops[$anchorIndex]);
+        foreach ($nonTerminalHops as $index => $hop) {
             $lines[] = $this->hopNotice($finding, $hop, $index);
         }
 
@@ -103,28 +105,18 @@ final class GithubReporter implements Reporter
      * non-terminal hops (0 .. hops-1). Falls back to the origin (index 0) when
      * none is marked, which is the only case a normal (non diff-aware) run
      * ever produces.
+     *
+     * @param array<int, Hop> $nonTerminalHops
      */
-    private function anchorIndex(Finding $finding): int
+    private function anchorIndex(array $nonTerminalHops): int
     {
-        foreach ($this->nonTerminalHops($finding) as $index => $hop) {
+        foreach ($nonTerminalHops as $index => $hop) {
             if ($hop->changed) {
                 return $index;
             }
         }
 
         return 0;
-    }
-
-    /**
-     * @return array<int, Hop> the anchor hop excluded, remaining non-terminal
-     *                         hops in chain order, keyed by their chain index
-     */
-    private function noticeHops(Finding $finding, int $anchorIndex): array
-    {
-        $hops = $this->nonTerminalHops($finding);
-        unset($hops[$anchorIndex]);
-
-        return $hops;
     }
 
     /**
