@@ -1,0 +1,5 @@
+--- a/tests/fixtures/changed-terminal-not-enough/src/Demo.php
++++ b/tests/fixtures/changed-terminal-not-enough/src/Demo.php
+@@ -37 +37 @@
+-    public function __construct(Cfg $config)
++    public function __construct(Cfg $config)

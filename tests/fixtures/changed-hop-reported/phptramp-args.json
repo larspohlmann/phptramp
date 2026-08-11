@@ -1,0 +1,1 @@
+["--limit", "1", "--diff", "tests/fixtures/changed-hop-reported/changes.diff"]
