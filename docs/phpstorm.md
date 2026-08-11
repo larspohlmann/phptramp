@@ -51,15 +51,15 @@ not required — add a custom watcher with these fields):
 | Field | Value |
 |---|---|
 | Name | `phptramp` |
-| Files to watch | `$ProjectFileDir$/*.php` (or a scope — see below) |
+| Scope | `Project PHP Files` (or a custom scope) |
 | Program | `$ProjectFileDir$/vendor/bin/phptramp` |
 | Arguments | `--file $FilePath$` |
 | Working directory | `$ProjectFileDir$` |
 | Output filters | `$FILE_PATH$:$LINE$` |
 
-Set **Files to watch** to a scope covering the project's PHP files
-(**Settings → Scopes → Project PHP Files**, or a custom scope). Program and
-arguments are identical to the External Tool.
+Set **Scope** to **Project PHP Files** (**Settings → Scopes → Project PHP
+Files**, or a custom scope) so the watcher fires only on the project's PHP
+sources. Program and arguments are identical to the External Tool.
 
 Leave **"Auto-save edited files to trigger the watcher"** **OFF**. With it on,
 the watcher fires phptramp, phptramp may report and the editor re-saves, which
