@@ -680,9 +680,15 @@ Tasks (expanded in `docs/plans/phase-2.md`):
 
 ---
 
-## Phase 3 — CI & config surface
+## Phase 3 — CI & config surface  (in progress — issue #5)
 
 **Deliverable:** all output formats, config file, suppression, dual thresholds, summary.
+
+**Detailed step-by-step plan: [docs/plans/phase-3.md](plans/phase-3.md)** — written
+against the actual Phase 1–2 interfaces; where it refines the sketches below (e.g.
+`Severity`/`Thresholds` as reporting-layer concepts, config precedence via
+parser-default seeding, suppression exposed through `MethodIndex::suppressions()`),
+the detailed plan wins.
 
 - **3.1 ConfigLoader:** `phptramp.json` then `phptramp.dist.json`; keys `paths`,
   `exclude`, `limit`, `warnLimit`, `format`, `baseline`; strict unknown-key error;
