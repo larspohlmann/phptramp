@@ -347,7 +347,7 @@ final class ApplicationTest extends TestCase
         self::assertSame(0, $exitCode);
         self::assertSame('', self::contents($this->stdout));
         self::assertStringContainsString(
-            'baseline written: ' . $baselineFile . ' (1 findings)',
+            'baseline written: ' . $baselineFile . ' (1 findings)' . "\n",
             self::contents($this->stderr),
         );
 
@@ -380,7 +380,10 @@ final class ApplicationTest extends TestCase
         ]);
 
         self::assertSame(2, $exitCode);
-        self::assertStringContainsString('phptramp:', self::contents($this->stderr));
+        self::assertSame(
+            'phptramp: unable to write baseline to ' . $folder . "\n",
+            self::contents($this->stderr),
+        );
         self::assertSame('', self::contents($this->stdout));
     }
 
@@ -396,7 +399,10 @@ final class ApplicationTest extends TestCase
         ]);
 
         self::assertSame(0, $exitCode);
-        self::assertStringContainsString('--baseline ignored', self::contents($this->stderr));
+        self::assertStringContainsString(
+            '--baseline ignored while generating a new baseline' . "\n",
+            self::contents($this->stderr),
+        );
         self::assertFileExists($baselineFile);
     }
 
@@ -522,11 +528,9 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(0, $exitCode);
         $stderr = self::contents($this->stderr);
-        $staleLines = $this->linesStartingWith($stderr, 'phptramp: stale baseline entry:');
-        self::assertCount(1, $staleLines);
-        self::assertStringContainsString(
-            '0000000000000000000000000000000000000000 fabricated stale entry',
-            $staleLines[0],
+        self::assertStringEndsWith(
+            "phptramp: stale baseline entry: 0000000000000000000000000000000000000000 fabricated stale entry\n",
+            $stderr,
         );
         self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale suppression:'));
     }

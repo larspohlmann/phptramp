@@ -235,6 +235,24 @@ final class SuppressionFilterTest extends TestCase
         self::assertSame([], $outcome->firedKeys);
     }
 
+    public function testHopMatchingBothMethodAndParamSuppressionsRecordsBothKeys(): void
+    {
+        // A single hop carrying both a method-level and a param-level
+        // #[TrampIgnore] must record both keys in firedKeys, proving
+        // matchedKeysFor / matchedKeysForHop return every matched key rather
+        // than only the first.
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->step($p); } } '
+            . 'class B { #[TrampIgnore] public function step(#[TrampIgnore] Cfg $p): void { '
+            . '(new C())->use($p); } } '
+            . 'class C { public function use(Cfg $p): void { $p->x(); } }';
+
+        $outcome = $this->buildOutcome($code);
+        self::assertCount(0, $outcome->kept);
+        self::assertContains(SuppressionIndex::methodKey('Demo\B::step'), $outcome->firedKeys);
+        self::assertContains(SuppressionIndex::paramKey('Demo\B::step', 'p'), $outcome->firedKeys);
+    }
+
     public function testFiredKeysAreDeduplicatedInFirstFiredOrder(): void
     {
         // Two findings both pass through the same suppressed method. The method

@@ -150,6 +150,24 @@ final class BaselineTest extends TestCase
         self::assertSame([$unmatchedLine], $baseline->staleEntries([$matched]));
     }
 
+    public function testStaleEntriesReturnsEveryUnmatchedLineInDocumentOrder(): void
+    {
+        $matched = $this->findingAlpha();
+        $firstUnmatched = $this->findingBeta();
+        $secondUnmatched = $this->findingGamma();
+        $matchedLine = Fingerprint::line($matched);
+        $firstStaleLine = Fingerprint::line($firstUnmatched);
+        $secondStaleLine = Fingerprint::line($secondUnmatched);
+        $document = json_encode(
+            ['fingerprints' => [$matchedLine, $firstStaleLine, $secondStaleLine]],
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES,
+        );
+
+        $baseline = Baseline::fromJson($document);
+
+        self::assertSame([$firstStaleLine, $secondStaleLine], $baseline->staleEntries([$matched]));
+    }
+
     public function testStaleEntriesIsEmptyWhenEveryEntryMatches(): void
     {
         $alpha = $this->findingAlpha();
@@ -161,10 +179,26 @@ final class BaselineTest extends TestCase
 
     public function testUnknownTopLevelKeyThrowsBaselineException(): void
     {
-        $this->expectException(BaselineException::class);
-        $this->expectExceptionMessage('fingerprint');
+        try {
+            Baseline::fromJson('{"fingerprint": []}');
+            self::fail('expected BaselineException');
+        } catch (BaselineException $e) {
+            self::assertSame('unknown baseline key: fingerprint', $e->getMessage());
+        }
+    }
 
-        Baseline::fromJson('{"fingerprint": []}');
+    public function testUnknownTopLevelKeyAlongsideFingerprintsThrowsBeforeParsingEntries(): void
+    {
+        // A document that carries both a valid "fingerprints" key and an
+        // unknown one must still reject the unknown key — the key-validation
+        // foreach runs before the entries are read, so a bad second key never
+        // silently un-gates CI.
+        try {
+            Baseline::fromJson('{"fingerprints": [], "extra": 1}');
+            self::fail('expected BaselineException');
+        } catch (BaselineException $e) {
+            self::assertSame('unknown baseline key: extra', $e->getMessage());
+        }
     }
 
     public function testNonListFingerprintsThrowsBaselineException(): void
@@ -183,11 +217,13 @@ final class BaselineTest extends TestCase
         Baseline::fromJson('{"fingerprints": [1]}');
     }
 
-    public function testInvalidJsonThrowsBaselineException(): void
+    public function testInvalidJsonThrowsBaselineExceptionWithExactMessage(): void
     {
-        $this->expectException(BaselineException::class);
-        $this->expectExceptionMessage('JSON');
-
-        Baseline::fromJson('{"fingerprints":');
+        try {
+            Baseline::fromJson('{"fingerprints":');
+            self::fail('expected BaselineException');
+        } catch (BaselineException $e) {
+            self::assertSame('baseline document is not valid JSON: Syntax error', $e->getMessage());
+        }
     }
 }

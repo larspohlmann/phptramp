@@ -68,4 +68,44 @@ final class SuppressionIndexTest extends TestCase
         self::assertFalse($index->suppressesParam('Demo\A::go', 'config'));
         self::assertFalse($index->suppressesLine('/path/to/File.php', 1));
     }
+
+    public function testMethodKeyIsLiteralMethodPrefixFollowedByFqmn(): void
+    {
+        self::assertSame(
+            'method:Demo\ServiceA::process',
+            SuppressionIndex::methodKey('Demo\ServiceA::process'),
+        );
+    }
+
+    public function testParamKeyIsLiteralParamPrefixFqmnAndParam(): void
+    {
+        self::assertSame(
+            'param:Demo\A::go::$config',
+            SuppressionIndex::paramKey('Demo\A::go', 'config'),
+        );
+    }
+
+    public function testLineKeyIsLiteralLinePrefixFileAndLine(): void
+    {
+        self::assertSame(
+            'line:/path/to/File.php:42',
+            SuppressionIndex::lineKey('/path/to/File.php', 42),
+        );
+    }
+
+    public function testKeysReturnsPublicFormatKeysInConfigurationOrder(): void
+    {
+        $index = new SuppressionIndex(
+            ['Demo\A::go'],
+            [['Demo\A::go', 'config']],
+            ['/path/to/File.php' => [10, 12]],
+        );
+
+        self::assertSame([
+            'method:Demo\A::go',
+            'param:Demo\A::go::$config',
+            'line:/path/to/File.php:10',
+            'line:/path/to/File.php:12',
+        ], $index->keys());
+    }
 }
