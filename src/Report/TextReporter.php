@@ -18,10 +18,13 @@ final class TextReporter implements Reporter
     private const COLUMN_GAP = '  ';
     private const MIN_LABEL_WIDTH = 8;
 
+    private readonly Pluralizer $pluralizer;
+
     public function __construct(
         private readonly Thresholds $thresholds,
         private readonly bool $explain = false,
     ) {
+        $this->pluralizer = new Pluralizer();
     }
 
     /**
@@ -187,8 +190,8 @@ final class TextReporter implements Reporter
         $keyword = $severity === Severity::Warning ? 'WARNING' : 'FINDING';
 
         return $keyword . '  $' . $finding->param . ': '
-            . $finding->hops . ' pass-through ' . $this->plural($finding->hops, 'hop')
-            . ' across ' . $finding->classes . ' ' . $this->plural($finding->classes, 'class', 'classes');
+            . $finding->hops . ' pass-through ' . $this->pluralizer->of($finding->hops, 'hop')
+            . ' across ' . $finding->classes . ' ' . $this->pluralizer->of($finding->classes, 'class', 'classes');
     }
 
     /**
@@ -198,35 +201,26 @@ final class TextReporter implements Reporter
     {
         $count = count($reportable);
         if ($this->thresholds->warnLimit === null) {
-            return $count . ' ' . $this->plural($count, 'finding') . ' (' . $this->limitClause() . ').';
+            return $count . ' ' . $this->pluralizer->of($count, 'finding') . ' (' . $this->limitClause() . ').';
         }
 
         $errorCount = count(array_filter($reportable, static fn (array $entry): bool => $entry[1] === Severity::Error));
         $warningCount = $count - $errorCount;
 
-        return $count . ' ' . $this->plural($count, 'finding') . ' ('
-            . $errorCount . ' ' . $this->plural($errorCount, 'error') . ', '
-            . $warningCount . ' ' . $this->plural($warningCount, 'warning') . '; '
+        return $count . ' ' . $this->pluralizer->of($count, 'finding') . ' ('
+            . $errorCount . ' ' . $this->pluralizer->of($errorCount, 'error') . ', '
+            . $warningCount . ' ' . $this->pluralizer->of($warningCount, 'warning') . '; '
             . $this->limitClause() . ').';
     }
 
     private function limitClause(): string
     {
-        $clause = 'limit: ' . $this->thresholds->limit . ' ' . $this->plural($this->thresholds->limit, 'hop');
+        $clause = 'limit: ' . $this->thresholds->limit . ' ' . $this->pluralizer->of($this->thresholds->limit, 'hop');
         if ($this->thresholds->warnLimit !== null) {
             $clause .= ', warn-limit: ' . $this->thresholds->warnLimit
-                . ' ' . $this->plural($this->thresholds->warnLimit, 'hop');
+                . ' ' . $this->pluralizer->of($this->thresholds->warnLimit, 'hop');
         }
 
         return $clause;
-    }
-
-    private function plural(int $count, string $singular, ?string $plural = null): string
-    {
-        if ($count === 1) {
-            return $singular;
-        }
-
-        return $plural ?? $singular . 's';
     }
 }

@@ -20,10 +20,12 @@ final class SummaryReporter implements Reporter
     private const MAX_BAR_LENGTH = 40;
 
     private readonly FindingMessage $message;
+    private readonly Pluralizer $pluralizer;
 
     public function __construct(private readonly Thresholds $thresholds)
     {
         $this->message = new FindingMessage();
+        $this->pluralizer = new Pluralizer();
     }
 
     /**
@@ -87,7 +89,7 @@ final class SummaryReporter implements Reporter
     {
         $labels = [];
         foreach ($hopCounts as $hops) {
-            $labels[$hops] = $hops . ' ' . $this->plural($hops, 'hop');
+            $labels[$hops] = $hops . ' ' . $this->pluralizer->of($hops, 'hop');
         }
 
         return $labels;
@@ -109,7 +111,7 @@ final class SummaryReporter implements Reporter
     {
         $top = $this->longestFindings($findings);
         $hopLabels = array_map(
-            fn (Finding $finding): string => $finding->hops . ' ' . $this->plural($finding->hops, 'hop'),
+            fn (Finding $finding): string => $finding->hops . ' ' . $this->pluralizer->of($finding->hops, 'hop'),
             $top,
         );
         $params = array_map(static fn (Finding $finding): string => '$' . $finding->param, $top);
@@ -188,9 +190,9 @@ final class SummaryReporter implements Reporter
             array_filter($findings, fn (Finding $finding): bool => $finding->hops >= $this->thresholds->limit),
         );
 
-        return $total . ' ' . $this->plural($total, 'chain') . ' total; '
+        return $total . ' ' . $this->pluralizer->of($total, 'chain') . ' total; '
             . $atOrOverLimit . ' at or over the limit (limit: '
-            . $this->thresholds->limit . ' ' . $this->plural($this->thresholds->limit, 'hop') . ').';
+            . $this->thresholds->limit . ' ' . $this->pluralizer->of($this->thresholds->limit, 'hop') . ').';
     }
 
     /**
@@ -216,10 +218,5 @@ final class SummaryReporter implements Reporter
         }
 
         return max($values);
-    }
-
-    private function plural(int $count, string $singular): string
-    {
-        return $count === 1 ? $singular : $singular . 's';
     }
 }

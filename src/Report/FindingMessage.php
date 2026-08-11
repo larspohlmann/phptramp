@@ -13,10 +13,18 @@ use PhpTramp\Chain\Finding;
  */
 final class FindingMessage
 {
+    private readonly Pluralizer $pluralizer;
+
+    public function __construct()
+    {
+        $this->pluralizer = new Pluralizer();
+    }
+
     public function describe(Finding $finding): string
     {
-        return '$' . $finding->param . ': ' . $finding->hops . ' pass-through ' . $this->plural($finding->hops, 'hop')
-            . ' across ' . $finding->classes . ' ' . $this->plural($finding->classes, 'class', 'classes')
+        return '$' . $finding->param . ': ' . $finding->hops . ' pass-through '
+            . $this->pluralizer->of($finding->hops, 'hop')
+            . ' across ' . $finding->classes . ' ' . $this->pluralizer->of($finding->classes, 'class', 'classes')
             . ' (terminal: ' . $this->terminalClause($finding) . ')';
     }
 
@@ -28,14 +36,5 @@ final class FindingMessage
         }
 
         return $finding->terminal . ' [' . $finding->terminalKind->value . ']';
-    }
-
-    private function plural(int $count, string $singular, ?string $plural = null): string
-    {
-        if ($count === 1) {
-            return $singular;
-        }
-
-        return $plural ?? $singular . 's';
     }
 }
