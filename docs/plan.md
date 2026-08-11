@@ -105,12 +105,16 @@ implementation. Every bullet is a fixture.
 9. **Diff-aware mode:** any-hop intersection at changed-**line** granularity. A chain is
    reported iff at least one hop's signature line or forwarding call-site line falls in
    the diff. Intersecting hops are marked in output ("this hop is yours").
-10. **Baseline fingerprint:** `sha1(originFQMN + "\0" + paramName + "\0" + terminalFQMN)`
-    — deliberately excludes line numbers and intermediate hops so refactors don't churn
-    the baseline.
+10. **Baseline fingerprint:** `sha1(originFQMN + "\0" + paramName + "\0" + terminalToken)`
+     — deliberately excludes line numbers and intermediate hops so refactors don't churn
+     the baseline. The terminal component is the terminal FQMN when the chain has one,
+     else the `TerminalKind` backing value (`external` / `truncated`) — NOT a per-reason
+     category. Coarser is deliberate: a chain whose truncation reason changes when
+     resolution improves stays baselined; re-opening grandfathered findings on
+     analyzer upgrades would destroy trust in the baseline.
 11. **Suppression:** `#[TrampIgnore]` attribute (on method or parameter) and
     `// phptramp-ignore` line comment; a chain is suppressed if any hop is suppressed.
-    Stale suppressions and stale baseline entries are reported (Phase 5).
+    Stale suppressions and stale baseline entries are reported (Phase 5 — shipped).
 
 ---
 
@@ -742,17 +746,27 @@ measured on the actual tree).
 
 ---
 
-## Phase 5 — Baseline
+## Phase 5 — Baseline  ✅ (complete — issue #9)
 
-- **5.1 Fingerprint:** frozen rule 10, exact bytes:
-  `sha1(origin . "\0" . param . "\0" . terminal)`. Truncated chains use
-  `truncated:<reason-category>` as terminal so resolution improvements don't silently
-  re-open baselined findings with a different reason string.
-- **5.2 Generate/consume:** `--generate-baseline phptramp-baseline.json` (sorted, one
+**Detailed step-by-step plan: [docs/plans/phase-5.md](plans/phase-5.md)** — written
+against the shipped Phase 1–4 interfaces; where it refines the sketches below
+(fingerprint terminal token = terminal FQMN or the TerminalKind value rather than
+a per-reason category; suppression refactored into a fired-tracking filter so
+stale ignores are detectable; stale detection skipped under `--changed-only`),
+the detailed plan wins.
+
+- [x] **5.1 Fingerprint:** frozen rule 10, exact bytes:
+  `sha1(origin . "\0" . param . "\0" . terminal)`. The terminal token is the
+  terminal FQMN when the chain resolves one, else the `TerminalKind` backing
+  value (`external` / `truncated`) — NOT a per-reason category — so resolution
+  improvements don't silently re-open baselined findings with a different
+  reason string.
+- [x] **5.2 Generate/consume:** `--generate-baseline phptramp-baseline.json` (sorted, one
   fingerprint per line-ish JSON for clean diffs); `--baseline` / config `baseline` key
   filters findings before exit-code computation.
-- **5.3 Stale detection:** baseline entries matching nothing and `#[TrampIgnore]`
+- [x] **5.3 Stale detection:** baseline entries matching nothing and `#[TrampIgnore]`
   suppressing nothing → warnings (never exit 1 by default; `--fail-on-stale` opts in).
+  Stale detection is skipped entirely under `--changed-only` (full runs only).
 
 ---
 

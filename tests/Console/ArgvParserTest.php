@@ -30,6 +30,7 @@ final class ArgvParserTest extends TestCase
         self::assertNull($o->diff);
         self::assertNull($o->baseline);
         self::assertFalse($o->dumpIndex);
+        self::assertFalse($o->failOnStale);
     }
 
     public function testFolderAccumulates(): void
@@ -152,6 +153,16 @@ final class ArgvParserTest extends TestCase
     public function testChangedOnlyFlag(): void
     {
         self::assertTrue($this->parse('--changed-only')->changedOnly);
+    }
+
+    public function testFailOnStaleFlag(): void
+    {
+        self::assertTrue($this->parse('--fail-on-stale')->failOnStale);
+    }
+
+    public function testFailOnStaleDefaultsToFalse(): void
+    {
+        self::assertFalse($this->parse()->failOnStale);
     }
 
     public function testDumpIndexFlag(): void

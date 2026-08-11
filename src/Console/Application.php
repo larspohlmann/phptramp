@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PhpTramp\Console;
 
+use PhpTramp\Baseline\Baseline;
+use PhpTramp\Baseline\BaselineException;
+use PhpTramp\Baseline\BaselineFilter;
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Config\ConfigException;
@@ -13,6 +16,7 @@ use PhpTramp\Diff\DiffException;
 use PhpTramp\Diff\DiffParser;
 use PhpTramp\Diff\GitDiffRunner;
 use PhpTramp\Discovery\FileLocator;
+use PhpTramp\Ignore\SuppressionFilter;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
@@ -125,18 +129,109 @@ final class Application
     {
         try {
             $thresholds = new Thresholds($options->limit, $options->warnLimit);
+            $baselineFilter = new BaselineFilter();
+            $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
-            $findings = $this->changedOnlyFindings($this->findChains($index), $options);
-        } catch (InvalidArgsException | ParseException | DiffException $e) {
+            $suppression = (new SuppressionFilter($index->suppressions()))->filter(
+                $this->changedOnlyFindings($this->findChains($index), $options),
+            );
+            $findings = $suppression->kept;
+        } catch (InvalidArgsException | ParseException | DiffException | BaselineException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
         }
 
+        if ($options->generateBaseline !== null) {
+            return $this->generateBaseline($findings, $thresholds, $options->generateBaseline, $options->baseline);
+        }
+
+        $staleReporter = new StaleReporter($baseline, $index->suppressions());
+        $staleLines = $staleReporter->lines($options->changedOnly, $findings, $suppression->firedKeys);
+        foreach ($staleLines as $line) {
+            fwrite($this->stderr, $line . "\n");
+        }
+
+        $findings = $baselineFilter->exclude($findings, $baseline);
+
         fwrite($this->stdout, $reporter->render($findings));
 
-        return $this->hasError($findings, $thresholds) ? 1 : 0;
+        return $staleReporter->exitCode(
+            $this->hasError($findings, $thresholds),
+            $options->failOnStale,
+            $staleLines,
+        );
+    }
+
+    /**
+     * Consume mode loads only when --baseline is set without --generate-baseline
+     * (generation wins when both are set and already notes the ignored flag).
+     * Fail fast before the expensive index build.
+     */
+    private function consumeBaseline(Options $options, BaselineFilter $baselineFilter): ?Baseline
+    {
+        if ($options->baseline === null || $options->generateBaseline !== null) {
+            return null;
+        }
+
+        return $baselineFilter->load($options->baseline);
+    }
+
+    /**
+     * Generation is maintenance, not a gate: it reuses the filter chain up to
+     * the suppression step, collects the findings a reporter would show
+     * (errors and warnings — warnings excluded would resurface on every later
+     * run), and writes a baseline document. Exits 0 regardless of findings.
+     *
+     * @param list<Finding> $findings
+     */
+    private function generateBaseline(
+        array $findings,
+        Thresholds $thresholds,
+        string $baselinePath,
+        ?string $consumeBaseline,
+    ): int {
+        if ($consumeBaseline !== null) {
+            fwrite(
+                $this->stderr,
+                'phptramp: --baseline ignored while generating a new baseline' . "\n",
+            );
+        }
+
+        $reportedFindings = $this->reportedFindings($findings, $thresholds);
+        $written = @file_put_contents($baselinePath, Baseline::generate($reportedFindings));
+        if ($written === false) {
+            fwrite($this->stderr, 'phptramp: unable to write baseline to ' . $baselinePath . "\n");
+
+            return 2;
+        }
+
+        fwrite(
+            $this->stderr,
+            'baseline written: ' . $baselinePath
+            . ' (' . count($reportedFindings) . ' findings)' . "\n",
+        );
+
+        return 0;
+    }
+
+    /**
+     * The findings a reporter would show: severity is non-null (error or warning).
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function reportedFindings(array $findings, Thresholds $thresholds): array
+    {
+        $reported = [];
+        foreach ($findings as $finding) {
+            if ($thresholds->severityOf($finding) !== null) {
+                $reported[] = $finding;
+            }
+        }
+
+        return $reported;
     }
 
     /**
@@ -297,6 +392,7 @@ final class Application
             Baseline:
               --baseline <file>         Ignore findings recorded in the baseline file
               --generate-baseline <file>  Write current findings to a baseline file
+              --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
 
             Debugging:
               --dump-index              Print the classified method index as JSON and exit
@@ -310,12 +406,16 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 4 - diff-aware mode is shipped: --changed-only /
-            --git-base / --diff report only chains touching the diff and mark
-            which hops are yours, across all six formats
-            (text/json/github/checkstyle/sarif/summary). phptramp.json config,
-            #[TrampIgnore]/phptramp-ignore suppression, and --warn-limit are
-            wired up. See docs/plan.md.
+            Status: Phase 5 - baseline is shipped: --generate-baseline /
+            --baseline ignore refactor-stable findings recorded in the file,
+            and --fail-on-stale exits 1 when a baseline entry or suppression
+            matches nothing (full runs only — stale detection is skipped
+            under --changed-only). Phase 4 - diff-aware mode
+            (--changed-only / --git-base / --diff) reports only chains
+            touching the diff and marks which hops are yours, across all six
+            formats (text/json/github/checkstyle/sarif/summary).
+            phptramp.json config, #[TrampIgnore]/phptramp-ignore suppression,
+            and --warn-limit are wired up. See docs/plan.md.
 
             TXT;
     }

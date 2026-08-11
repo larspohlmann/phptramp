@@ -40,6 +40,7 @@ final class ArgvParser
         '-h',
         '--version',
         '-V',
+        '--fail-on-stale',
     ];
 
     private const VALID_FORMATS = ['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'];
@@ -51,14 +52,10 @@ final class ArgvParser
     private int $limit = 3;
     private ?int $warnLimit = null;
     private string $format = 'text';
-    private bool $explain = false;
     private DiffAwareFlags $diffAware;
+    private BoolFlags $bools;
     private ?string $baseline = null;
     private ?string $generateBaseline = null;
-    private bool $dumpIndex = false;
-    private bool $noConfig = false;
-    private bool $help = false;
-    private bool $version = false;
     private bool $clearedSeededPaths = false;
     /** @var list<string> */
     private array $exclude = [];
@@ -82,16 +79,17 @@ final class ArgvParser
             limit: $this->limit,
             warnLimit: $this->warnLimit,
             format: $this->format,
-            explain: $this->explain,
+            explain: $this->bools->explain,
             changedOnly: $this->diffAware->changedOnly,
             gitBase: $this->diffAware->gitBase,
             diff: $this->diffAware->diff,
             baseline: $this->baseline,
             generateBaseline: $this->generateBaseline,
-            dumpIndex: $this->dumpIndex,
-            noConfig: $this->noConfig,
-            help: $this->help,
-            version: $this->version,
+            dumpIndex: $this->bools->dumpIndex,
+            noConfig: $this->bools->noConfig,
+            help: $this->bools->help,
+            version: $this->bools->version,
+            failOnStale: $this->bools->failOnStale,
             exclude: $this->exclude,
         );
     }
@@ -103,14 +101,17 @@ final class ArgvParser
         $this->limit = $defaults->limit;
         $this->warnLimit = $defaults->warnLimit;
         $this->format = $defaults->format;
-        $this->explain = $defaults->explain;
         $this->diffAware = new DiffAwareFlags($defaults->changedOnly, $defaults->gitBase, $defaults->diff);
+        $this->bools = new BoolFlags(
+            explain: $defaults->explain,
+            dumpIndex: $defaults->dumpIndex,
+            noConfig: $defaults->noConfig,
+            help: $defaults->help,
+            version: $defaults->version,
+            failOnStale: $defaults->failOnStale,
+        );
         $this->baseline = $defaults->baseline;
         $this->generateBaseline = $defaults->generateBaseline;
-        $this->dumpIndex = $defaults->dumpIndex;
-        $this->noConfig = $defaults->noConfig;
-        $this->help = $defaults->help;
-        $this->version = $defaults->version;
         $this->exclude = $defaults->exclude;
         $this->clearedSeededPaths = false;
     }
@@ -168,12 +169,13 @@ final class ArgvParser
     private function applyBoolFlag(string $name): void
     {
         match ($name) {
-            '--explain' => $this->explain = true,
+            '--explain' => $this->bools->explain = true,
             '--changed-only' => $this->diffAware->changedOnly = true,
-            '--dump-index' => $this->dumpIndex = true,
-            self::NO_CONFIG_FLAG => $this->noConfig = true,
-            '--help', '-h' => $this->help = true,
-            '--version', '-V' => $this->version = true,
+            '--dump-index' => $this->bools->dumpIndex = true,
+            self::NO_CONFIG_FLAG => $this->bools->noConfig = true,
+            '--help', '-h' => $this->bools->help = true,
+            '--version', '-V' => $this->bools->version = true,
+            '--fail-on-stale' => $this->bools->failOnStale = true,
             default => throw new InvalidArgsException("unknown option: {$name}"),
         };
     }

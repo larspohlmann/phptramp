@@ -4,13 +4,15 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 4.** Cross-file chain reporting works: `phptramp --folder src`
-stitches forwarding chains across files and prints findings in any of six formats,
-exiting `0`/`1`/`2`. A `phptramp.json` config file, `#[TrampIgnore]`/
+**Status: Phase 5.** Cross-file chain reporting works: `phptramp --folder src`
+stitches forwarding chains across files and prints findings in any of six
+formats, exiting `0`/`1`/`2`. A `phptramp.json` config file, `#[TrampIgnore]`/
 `// phptramp-ignore` suppression, and a `--warn-limit` warning tier are all wired
-up. Diff-aware mode (`--changed-only`/`--git-base`/`--diff`) is shipped too — see
-below. The classifier and whole-project index remain inspectable via `--dump-index`.
-See [docs/plan.md](docs/plan.md) for the full implementation plan and current phase.
+up. Diff-aware mode (`--changed-only`/`--git-base`/`--diff`) and baselining
+(`--generate-baseline`/`--baseline`/`--fail-on-stale`) are shipped too — see
+below. The classifier and whole-project index remain inspectable via
+`--dump-index`. See [docs/plan.md](docs/plan.md) for the full implementation plan
+and current phase.
 
 ## What it does
 
@@ -103,8 +105,9 @@ phptramp [options]
   --changed-only            Only report chains touching changed lines
   --git-base <ref>          Diff base for --changed-only (default: origin/main)
   --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
-  --baseline <file>         Reserved for baselining (Phase 5) — accepted, not yet wired up
-  --generate-baseline <f>   Reserved for baselining (Phase 5) — accepted, not yet wired up
+  --baseline <file>         Ignore findings recorded in the baseline file
+  --generate-baseline <f>   Write current findings to a baseline file
+  --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
 ```
 
 Exit codes: `0` no finding at error severity, `1` at least one finding at/over
@@ -133,7 +136,7 @@ key, or a value of the wrong type, is a config error rather than a silently igno
 | `limit` | integer | `--limit` |
 | `warnLimit` | integer | `--warn-limit` |
 | `format` | string | `--format` |
-| `baseline` | string | `--baseline` (reserved for Phase 5) |
+| `baseline` | string | `--baseline` |
 
 ## Output formats
 
@@ -175,6 +178,44 @@ count falls in `[warn-limit, limit)` render at `severity: "warning"` (`WARNING` 
 `::warning` in the GitHub format, `"level": "warning"` in SARIF, …) but never fail the
 run — only chains at or over `--limit` set exit code `1`. Useful for tightening a hop
 budget gradually: warn today, promote to a hard failure once the codebase is clean.
+
+## Baseline
+
+`--baseline` keeps pre-existing tramp data from gating CI on a codebase you adopt
+phptramp against mid-flight. The fingerprint is refactor-stable: a sha1 over the
+chain's semantic identity only (origin FQMN, parameter name, terminal token — never
+line numbers or intermediate hops), so shortening a chain, moving a file, or shifting
+a line does *not* "re-open" a baselined finding. The terminal token is the terminal
+FQMN when the chain resolves one, else the terminal kind (`external`/`truncated`);
+a chain whose truncation reason changes when resolution improves stays baselined.
+
+The adoption story:
+
+1. **Snapshot.** Run `phptramp --folder src --generate-baseline phptramp-baseline.json`
+   once on the current tree. The file is sorted, stable JSON — one entry per finding,
+   diff-clean to commit and review.
+2. **Commit.** Check `phptramp-baseline.json` into the repo alongside `phptramp.json`.
+3. **Gate.** Run `phptramp --folder src --baseline phptramp-baseline.json` in CI.
+   Every entry in the file is invisible to the reporters and the exit code —
+   identical to not existing. New or re-shaped chains above `--limit` fail the build
+   as usual.
+4. **Shrink.** Fix a baselined chain and the matching entry becomes *stale*: phptramp
+   prints `phptramp: stale baseline entry: <…>` on stderr and (with `--fail-on-stale`)
+   exits `1`, nudging you to delete the line and let the gate cover that chain again.
+
+`--fail-on-stale` opts a repo into strict stale hygiene — exit `1` whenever a
+baseline entry or a suppression matches nothing. Without it, stale lines are
+stderr-only warnings and never change the exit code.
+
+### `--changed-only` interaction
+
+Stale detection is **skipped entirely under `--changed-only`** (full runs only).
+The diff filter removes most chains before the baseline is matched, so "stale"
+would be almost everything almost always — meaningless noise. Compose
+`--changed-only --baseline` on PRs to gate on *new* chains touching the diff while
+the baseline keeps the rest quiet; run a full scan (without `--changed-only`) on a
+schedule or nightly to surface stale entries and prune the file. See
+[docs/ci.md](docs/ci.md) for the legacy-adoption recipe.
 
 ## IDE integration
 
