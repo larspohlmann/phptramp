@@ -770,7 +770,14 @@ the detailed plan wins.
 
 ---
 
-## Phase 6 — Performance & release
+## Phase 6 — Performance & release  (in progress — issue #11)
+
+**Detailed step-by-step plan: [docs/plans/phase-6.md](plans/phase-6.md)** — written
+against the shipped Phase 1–5 interfaces; where it refines the sketches below, the
+detailed plan wins. Notably: parallel indexing (6.2) is **deferred on evidence** —
+measured cold indexing is ≈ 19.6s for a 600k-LOC vendor tree (≈ 1.6s per 50k LOC),
+so the per-file cache alone meets the stated warm-run target; the worker-pool
+complexity is moved to the post-v0.1 roadmap with the measurement recorded.
 
 - **6.1 Index cache:** per-file serialized `MethodInfo[]` keyed by (path, mtime, size,
   tool version) under `.phptramp.cache/`; `--no-cache` flag. Target: warm re-run on a
