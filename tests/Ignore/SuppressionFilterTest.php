@@ -275,6 +275,25 @@ final class SuppressionFilterTest extends TestCase
         self::assertSame([$methodKey, $altKey], $outcome->firedKeys);
     }
 
+    public function testOneSuppressedMethodSharedByTwoChainsFiresItsKeyExactlyOnce(): void
+    {
+        // Two distinct origins funnel through the *same* suppressed method
+        // (Relay::pass), so both findings match the identical method key. It
+        // must land in firedKeys once, not once per finding — the run-global
+        // dedup in filter() is the sole guard now that matchedKeysFor no longer
+        // dedups per finding.
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class Relay { #[TrampIgnore] public function pass(Cfg $config): void { (new Sink())->take($config); } } '
+            . 'class Controller { '
+            . 'public function handle(Cfg $config): void { (new Relay())->pass($config); } '
+            . 'public function handleAlt(Cfg $config): void { (new Relay())->pass($config); } } '
+            . 'class Sink { public function take(Cfg $config): void { $config->x(); } }';
+
+        $outcome = $this->buildOutcome($code);
+        self::assertCount(0, $outcome->kept);
+        self::assertSame([SuppressionIndex::methodKey('Demo\Relay::pass')], $outcome->firedKeys);
+    }
+
     private function buildOutcome(string $code): SuppressionOutcome
     {
         $this->file = tempnam(sys_get_temp_dir(), 'phptramp') . '.php';

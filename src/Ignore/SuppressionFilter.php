@@ -56,8 +56,9 @@ final class SuppressionFilter
     /**
      * The keys matched by any hop of this finding, in chain order and within a
      * hop in the frozen check order (method, param, declaration line, line
-     * above, forward line). Deduplicated within the finding so a key that
-     * matches on multiple hops records once, at its first-fired position.
+     * above, forward line). Duplicates across hops are left in: {@see filter()}
+     * dedups every key against a run-global set before recording it, so a
+     * second dedup here would be dead work.
      *
      * The terminal hop is skipped: `forwardLine === null` identifies it (the
      * terminal forwards nowhere), matching the old `ChainTraversal` guard and
@@ -69,18 +70,12 @@ final class SuppressionFilter
     private function matchedKeysFor(Finding $finding): array
     {
         $matched = [];
-        $seen = [];
 
         foreach ($finding->chain as $hop) {
             if ($hop->forwardLine === null) {
                 continue;
             }
             foreach ($this->matchedKeysForHop($hop) as $key) {
-                if (isset($seen[$key])) {
-                    continue;
-                }
-
-                $seen[$key] = true;
                 $matched[] = $key;
             }
         }
