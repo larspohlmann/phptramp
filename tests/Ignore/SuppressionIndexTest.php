@@ -36,6 +36,30 @@ final class SuppressionIndexTest extends TestCase
         self::assertFalse($index->suppressesLine('/other/File.php', 10));
     }
 
+    public function testSuppressesParamForMultipleDistinctPairsIndependently(): void
+    {
+        $index = new SuppressionIndex([], [
+            ['Demo\A::go', 'config'],
+            ['Demo\B::step', 'other'],
+        ], []);
+
+        self::assertTrue($index->suppressesParam('Demo\A::go', 'config'));
+        self::assertTrue($index->suppressesParam('Demo\B::step', 'other'));
+        self::assertFalse($index->suppressesParam('Demo\B::step', 'config'));
+    }
+
+    public function testSuppressesLineAcrossMultipleFilesIndependently(): void
+    {
+        $index = new SuppressionIndex([], [], [
+            '/path/to/A.php' => [10],
+            '/path/to/B.php' => [20],
+        ]);
+
+        self::assertTrue($index->suppressesLine('/path/to/A.php', 10));
+        self::assertTrue($index->suppressesLine('/path/to/B.php', 20));
+        self::assertFalse($index->suppressesLine('/path/to/B.php', 10));
+    }
+
     public function testEmptyIndexSuppressesNothing(): void
     {
         $index = new SuppressionIndex([], [], []);

@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace PhpTramp\Index;
 
 use PhpParser\Node;
-use PhpParser\Node\AttributeGroup;
-use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\FunctionLike;
 use PhpParser\Node\Name;
-use PhpParser\Node\Param;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -41,19 +38,12 @@ final class IndexingVisitor extends NodeVisitorAbstract
     /** @var array<string, ClassFacts> */
     private array $classes = [];
 
-    /** @var list<string> */
-    private array $suppressedMethods = [];
-
-    /** @var list<string> */
-    private array $suppressedClasses = [];
-
-    /** @var list<array{string, string}> */
-    private array $suppressedParams = [];
-
-    /** @var array<string, list<int>> */
-    private array $ignoreLines = [];
-
     private string $file = '';
+
+    public function __construct(
+        private readonly SuppressionCollector $suppressionCollector = new SuppressionCollector(),
+    ) {
+    }
 
     public function setFile(string $file): void
     {
@@ -85,23 +75,12 @@ final class IndexingVisitor extends NodeVisitorAbstract
 
     public function recordIgnoreComments(string $code): void
     {
-        foreach (explode("\n", $code) as $index => $lineText) {
-            if (str_contains($lineText, '// phptramp-ignore')) {
-                $this->ignoreLines[$this->file][] = $index + 1;
-            }
-        }
+        $this->suppressionCollector->recordIgnoreComments($this->file, $code);
     }
 
     public function suppressions(): SuppressionIndex
     {
-        $methods = $this->suppressedMethods;
-        foreach ($this->pending as $entry) {
-            if ($entry['class'] !== null && in_array($entry['class'], $this->suppressedClasses, true)) {
-                $methods[] = $entry['fqmn'];
-            }
-        }
-
-        return new SuppressionIndex($methods, $this->suppressedParams, $this->ignoreLines);
+        return $this->suppressionCollector->suppressions($this->pending);
     }
 
     /**
@@ -149,9 +128,7 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'traits' => [],
         ];
 
-        if ($this->hasTrampIgnore($node->attrGroups)) {
-            $this->suppressedClasses[] = $fqcn;
-        }
+        $this->suppressionCollector->recordClassAttributes($fqcn, $node->attrGroups);
     }
 
     private function kindOf(ClassLike $node): ClassKind
@@ -193,7 +170,7 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'node' => $node,
         ];
 
-        $this->recordFunctionLikeSuppressions($fqmn, $node);
+        $this->suppressionCollector->recordFunctionLikeAttributes($fqmn, $node);
     }
 
     private function recordFunction(Function_ $node): void
@@ -211,45 +188,7 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'node' => $node,
         ];
 
-        $this->recordFunctionLikeSuppressions($fqmn, $node);
-    }
-
-    private function recordFunctionLikeSuppressions(string $fqmn, FunctionLike $node): void
-    {
-        if ($this->hasTrampIgnore($node->getAttrGroups())) {
-            $this->suppressedMethods[] = $fqmn;
-        }
-
-        foreach ($node->getParams() as $param) {
-            if ($this->hasTrampIgnore($param->attrGroups)) {
-                $this->recordSuppressedParam($fqmn, $param);
-            }
-        }
-    }
-
-    private function recordSuppressedParam(string $fqmn, Param $param): void
-    {
-        if (! $param->var instanceof Variable || ! is_string($param->var->name)) {
-            return;
-        }
-
-        $this->suppressedParams[] = [$fqmn, $param->var->name];
-    }
-
-    /**
-     * @param array<AttributeGroup> $attrGroups
-     */
-    private function hasTrampIgnore(array $attrGroups): bool
-    {
-        foreach ($attrGroups as $group) {
-            foreach ($group->attrs as $attribute) {
-                if ($attribute->name->getLast() === 'TrampIgnore') {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        $this->suppressionCollector->recordFunctionLikeAttributes($fqmn, $node);
     }
 
     private function enclosingClassName(Node $node): ?string

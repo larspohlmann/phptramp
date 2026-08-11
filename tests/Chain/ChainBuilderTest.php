@@ -342,4 +342,52 @@ final class ChainBuilderTest extends TestCase
 
         self::assertCount(1, $this->build($code));
     }
+
+    public function testIgnoreMarkerInsideAStringLiteralDoesNotSuppress(): void
+    {
+        // The marker text appears inside a string literal on the forwarding
+        // line, not in an actual PHP comment. It must not be mistaken for a
+        // suppression - the finding must still be reported.
+        $code = "<?php namespace Demo; class Cfg {}\n"
+            . 'class A { public function go(Cfg $p): void { '
+            . '$note = "see // phptramp-ignore for context"; (new B())->step($p); } } '
+            . 'class B { public function step(Cfg $p): void { $p->x(); } }';
+
+        self::assertCount(1, $this->build($code));
+    }
+
+    public function testRenamedParamAtNonOriginHopSuppressesOnlyThatParamsChains(): void
+    {
+        // The attribute sits on a mid-chain hop's own (differently-named)
+        // parameter, not the origin's. This proves the per-hop param name used
+        // for suppression lookup comes from PartialChain::keys (built from
+        // B::mid's own param name) rather than the origin's param name. The
+        // sibling param "other", bound positionally to B::mid's un-suppressed
+        // second param, must still be found.
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class A { public function go(Cfg $ignored, Cfg $kept): void { '
+            . '(new B())->mid($ignored, $kept); } } '
+            . 'class B { public function mid(#[TrampIgnore] Cfg $renamed, Cfg $other): void { '
+            . '(new C())->takeRenamed($renamed); (new C())->takeOther($other); } } '
+            . 'class C { public function takeRenamed(Cfg $p): void { $p->x(); } '
+            . 'public function takeOther(Cfg $p): void { $p->x(); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+        self::assertSame('kept', $findings[0]->param);
+        self::assertSame('Demo\C::takeOther', $findings[0]->terminal);
+    }
+
+    public function testShortNameAttributeMatchesWithoutImportingOurTrampIgnoreClass(): void
+    {
+        // No `use PhpTramp\Ignore\TrampIgnore;` here: matching is purely by the
+        // attribute name's short name, so analyzed codebases are not required
+        // to autoload our class.
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->step($p); } } '
+            . 'class B { #[TrampIgnore] public function step(Cfg $p): void { (new C())->use($p); } } '
+            . 'class C { public function use(Cfg $p): void { $p->x(); } }';
+
+        self::assertCount(0, $this->build($code));
+    }
 }
