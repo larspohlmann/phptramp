@@ -8,8 +8,9 @@ namespace PhpTramp\Ignore;
  * O(1) membership lookups for every suppression collected during indexing:
  * methods (and classes, already expanded to their member FQMNs) suppressed by
  * a `TrampIgnore` attribute, individual params suppressed by the same, and
- * source lines carrying a `// phptramp-ignore` comment. Immutable; produced
- * by {@see \PhpTramp\Index\IndexingVisitor::suppressions()}.
+ * source lines carrying a `// phptramp-ignore` comment. Immutable; produced by
+ * {@see \PhpTramp\Index\Indexer}, which merges per-file suppression parts
+ * into one index.
  *
  * The static `*Key()` builders and {@see keys()} expose every configured entry
  * as a stable string key, so the suppression filter can record which entries

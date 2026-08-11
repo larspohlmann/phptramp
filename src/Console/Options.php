@@ -37,6 +37,8 @@ final class Options
         public readonly bool $version = false,
         public readonly bool $failOnStale = false,
         public readonly array $exclude = [],
+        public readonly bool $noCache = false,
+        public readonly string $cacheDir = '.phptramp.cache',
     ) {
     }
 }

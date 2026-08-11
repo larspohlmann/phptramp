@@ -21,14 +21,39 @@ final class ApplicationTest extends TestCase
     /** @var list<string> */
     private array $folders = [];
 
+    /** @var list<string> */
+    private array $directoriesToRemove = [];
+
     protected function tearDown(): void
     {
         foreach ($this->folders as $folder) {
-            array_map('unlink', glob($folder . '/*') ?: []);
-            if (is_dir($folder)) {
-                rmdir($folder);
+            $this->removeTree($folder);
+        }
+        foreach ($this->directoriesToRemove as $directory) {
+            $this->removeTree($directory);
+        }
+    }
+
+    /**
+     * Recursively removes a directory and its contents. Fixture folders now
+     * hold a `.phptramp.cache/` subdirectory (the default cache is on), so the
+     * cleanup must descend one level rather than only unlink direct children.
+     */
+    private function removeTree(string $directory): void
+    {
+        if (! is_dir($directory)) {
+            return;
+        }
+        // scandir (not glob) so dotfiles like `.phptramp.cache/` are cleared.
+        foreach (array_diff(scandir($directory) ?: [], ['.', '..']) as $entry) {
+            $path = $directory . '/' . $entry;
+            if (is_dir($path)) {
+                $this->removeTree($path);
+            } else {
+                unlink($path);
             }
         }
+        rmdir($directory);
     }
 
     protected function setUp(): void
@@ -69,7 +94,7 @@ final class ApplicationTest extends TestCase
         $help = self::contents($this->stdout);
         $documented = [
             '--folder', '--file', '--files', '--limit',
-            '--format', '--changed-only', '--baseline', 'Exit codes',
+            '--format', '--changed-only', '--baseline', '--no-cache', 'Exit codes',
         ];
         foreach ($documented as $expected) {
             self::assertStringContainsString($expected, $help);
@@ -582,6 +607,136 @@ final class ApplicationTest extends TestCase
         self::assertSame(0, $exitCode);
         $stderr = self::contents($this->stderr);
         self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale'));
+    }
+
+    /**
+     * Two consecutive runs against the same cache dir must produce
+     * byte-identical stdout (cache transparency) and leave one `.cache` entry
+     * per indexed source file. The cache dir lives outside the analyzed cwd
+     * so the file locator never sees it.
+     */
+    public function testTwoRunsShareCacheAndProduceByteIdenticalStdoutWithOneEntryPerSourceFile(): void
+    {
+        [$cwd, $cacheDir] = $this->cacheableCwdWithThreeHopChain();
+
+        $firstStdout = $this->runInCwd($cwd);
+        self::assertStringContainsString('FINDING', $firstStdout);
+
+        $secondStdout = $this->runInCwd($cwd);
+
+        self::assertSame($firstStdout, $secondStdout);
+        self::assertCount(1, glob($cacheDir . '/*.cache') ?: []);
+    }
+
+    /**
+     * Editing a source file between runs invalidates its cache entry by
+     * mtime/size, so the re-parse surfaces the new chain. Proves the cache
+     * never masks a real change.
+     */
+    public function testEditedSourceFileInvalidatesCacheAndSurfacesNewFinding(): void
+    {
+        [$cwd, $cacheDir] = $this->cacheableCwdWithOneHopChain();
+
+        $firstStdout = $this->runInCwd($cwd);
+        self::assertStringContainsString('No tramp data found', $firstStdout);
+
+        file_put_contents($cwd . '/Demo.php', $this->threeHopChainCode());
+
+        $secondStdout = $this->runInCwd($cwd);
+        self::assertStringContainsString('FINDING', $secondStdout);
+    }
+
+    /**
+     * --no-cache disables the cache entirely: even with a configured cache dir,
+     * no cache directory is ever created on disk.
+     */
+    public function testNoCacheFlagLeavesCacheDirAbsent(): void
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-cache-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+        file_put_contents($folder . '/Demo.php', $this->threeHopChainCode());
+
+        $cacheDir = $folder . '/.phptramp.cache';
+
+        self::assertSame(1, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--no-cache',
+        ]));
+        self::assertDirectoryDoesNotExist($cacheDir);
+    }
+
+    /**
+     * Builds a temp cwd containing a 3-hop chain Demo.php plus a phptramp.json
+     * that points the cache at a separate temp dir, and returns both paths.
+     *
+     * @return array{0: string, 1: string} [cwd, cacheDir]
+     */
+    private function cacheableCwdWithThreeHopChain(): array
+    {
+        return $this->cacheableCwd($this->threeHopChainCode());
+    }
+
+    /** @return array{0: string, 1: string} [cwd, cacheDir] */
+    private function cacheableCwdWithOneHopChain(): array
+    {
+        $oneHop = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+
+        return $this->cacheableCwd($oneHop);
+    }
+
+    /**
+     * @return array{0: string, 1: string} [cwd, cacheDir]
+     */
+    private function cacheableCwd(string $sourceCode): array
+    {
+        $cwd = sys_get_temp_dir() . '/phptramp-cwd-' . uniqid();
+        $cacheDir = sys_get_temp_dir() . '/phptramp-cache-' . uniqid();
+        mkdir($cwd);
+        $this->folders[] = $cwd;
+        $this->directoriesToRemove[] = $cacheDir;
+
+        file_put_contents($cwd . '/Demo.php', $sourceCode);
+        file_put_contents(
+            $cwd . '/phptramp.json',
+            '{"paths": ["."], "cache": ' . json_encode($cacheDir) . '}',
+        );
+
+        return [$cwd, $cacheDir];
+    }
+
+    /**
+     * Runs a fresh Application with cwd set to $cwd and returns its stdout.
+     */
+    private function runInCwd(string $cwd): string
+    {
+        $stdout = fopen('php://memory', 'w+');
+        $stderr = fopen('php://memory', 'w+');
+        self::assertIsResource($stdout);
+        self::assertIsResource($stderr);
+
+        $app = new Application($stdout, $stderr);
+        $previousCwd = getcwd();
+        self::assertIsString($previousCwd);
+
+        try {
+            chdir($cwd);
+            $app->run(['phptramp']);
+        } finally {
+            chdir($previousCwd);
+        }
+
+        return self::contents($stdout);
+    }
+
+    private function threeHopChainCode(): string
+    {
+        return '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { public function process(Cfg $config): void { (new ServiceB())->run($config); } } '
+            . 'class ServiceB { public function run(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
     }
 
     /**

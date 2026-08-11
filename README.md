@@ -4,15 +4,16 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 5.** Cross-file chain reporting works: `phptramp --folder src`
-stitches forwarding chains across files and prints findings in any of six
-formats, exiting `0`/`1`/`2`. A `phptramp.json` config file, `#[TrampIgnore]`/
-`// phptramp-ignore` suppression, and a `--warn-limit` warning tier are all wired
-up. Diff-aware mode (`--changed-only`/`--git-base`/`--diff`) and baselining
+**Status: v0.1.0** — the first release. phptramp detects tramp data across
+file boundaries: `phptramp --folder src` stitches forwarding chains across files
+and prints findings in any of six formats, exiting `0`/`1`/`2`. A
+`phptramp.json` config file, `#[TrampIgnore]`/`// phptramp-ignore` suppression,
+and a `--warn-limit` warning tier are all wired up. Diff-aware mode
+(`--changed-only`/`--git-base`/`--diff`) and baselining
 (`--generate-baseline`/`--baseline`/`--fail-on-stale`) are shipped too — see
-below. The classifier and whole-project index remain inspectable via
-`--dump-index`. See [docs/plan.md](docs/plan.md) for the full implementation plan
-and current phase.
+below. A per-file index cache (default-on, `--no-cache` to disable) makes warm
+re-runs fast enough for per-save IDE use. The classifier and whole-project
+index remain inspectable via `--dump-index`.
 
 ## What it does
 
@@ -108,6 +109,7 @@ phptramp [options]
   --baseline <file>         Ignore findings recorded in the baseline file
   --generate-baseline <f>   Write current findings to a baseline file
   --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
+  --no-cache                Disable the per-file index cache (re-parse every file)
 ```
 
 Exit codes: `0` no finding at error severity, `1` at least one finding at/over
@@ -137,6 +139,42 @@ key, or a value of the wrong type, is a config error rather than a silently igno
 | `warnLimit` | integer | `--warn-limit` |
 | `format` | string | `--format` |
 | `baseline` | string | `--baseline` |
+| `cache` | string | directory for the per-file index cache (default: `.phptramp.cache/`, resolved relative to the config file's directory) |
+
+## Index cache
+
+phptramp caches each source file's parsed index under `.phptramp.cache/` (a
+per-file cache, default-on). The cache is what makes warm re-runs — including
+per-save IDE invocations — cheap: the whole-project index (the part call
+resolution needs) rebuilds from cache instead of re-parsing every file.
+
+- **Disable** with `--no-cache`, or **move the directory** with the `cache`
+  config key (see [Configuration](#configuration)).
+- **Identity-validated and version-keyed.** Each entry stores the source
+  file's path, mtime, and size, plus the tool and payload-format versions. Any
+  mismatch — an edited file, a bumped version, a corrupt or stale entry — is
+  a silent cache miss followed by a fresh parse. A stale or corrupt cache
+  **never changes findings**.
+- **Safe to wipe.** Delete `.phptramp.cache/` any time; the next run simply
+  re-parses and repopulates it. Add `/.phptramp.cache/` to your own
+  `.gitignore` so the cache is not committed.
+
+### Performance
+
+Recorded 2026-08-11 on the maintainer's machine (Apple Silicon, PHP 8.4.23):
+
+| Run | Wall-clock | Notes |
+|---|---|---|
+| `--folder vendor` cold | ≈ 19.6s | 4,610 files / 601,867 lines parsed |
+| `--folder vendor` warm | ≈ 4.5s | cache hot — indexing ≈ 0; the residual is chain resolution + reporting |
+| `--folder src` cold (36 files) | ≈ 0.24s | small project baseline |
+| Extrapolation | ≈ 1.6s cold per 50k LOC | linear in parsed lines |
+
+The cache eliminates the parsing portion of a run (≈ 15s saved on the
+`--folder vendor` measurement); chain resolution and reporting are unchanged.
+On a typical `src/` the warm per-save run is effectively instant after the
+first cold run. See [docs/phpstorm.md](docs/phpstorm.md) for the IDE use this
+enables.
 
 ## Output formats
 
@@ -220,9 +258,9 @@ schedule or nightly to surface stale entries and prune the file. See
 ## IDE integration
 
 PhpStorm (and any IDE with external-tool support) can run phptramp per file via
-`--file`; a documented External Tool / File Watcher recipe ships in Phase 6.
-`--format=checkstyle` and `--format=sarif` cover CI annotation ecosystems,
-including GitHub Code Scanning.
+`--file`; a documented External Tool + File Watcher recipe is in
+[docs/phpstorm.md](docs/phpstorm.md). `--format=checkstyle` and `--format=sarif`
+cover CI annotation ecosystems, including GitHub Code Scanning.
 
 ## Non-goals
 

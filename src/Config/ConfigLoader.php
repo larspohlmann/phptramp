@@ -89,6 +89,7 @@ final class ConfigLoader
         $warnLimit = $defaults->warnLimit;
         $format = $defaults->format;
         $baseline = $defaults->baseline;
+        $cacheDir = $defaults->cacheDir;
 
         foreach ($config as $key => $value) {
             match ($key) {
@@ -98,6 +99,7 @@ final class ConfigLoader
                 'warnLimit' => $warnLimit = $this->requireInt('warnLimit', $value),
                 'format' => $format = $this->requireString('format', $value),
                 'baseline' => $baseline = $this->requireString('baseline', $value),
+                'cache' => $cacheDir = $this->requireString('cache', $value),
                 default => throw new ConfigException("unknown config key: {$key}"),
             };
         }
@@ -110,6 +112,7 @@ final class ConfigLoader
             format: $format,
             baseline: $baseline,
             exclude: $exclude,
+            cacheDir: $cacheDir,
         );
     }
 

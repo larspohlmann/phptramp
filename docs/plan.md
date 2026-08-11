@@ -770,19 +770,33 @@ the detailed plan wins.
 
 ---
 
-## Phase 6 — Performance & release
+## Phase 6 — Performance & release  (Tasks 1–5 done on this branch; release follows merge — issue #11)
 
-- **6.1 Index cache:** per-file serialized `MethodInfo[]` keyed by (path, mtime, size,
-  tool version) under `.phptramp.cache/`; `--no-cache` flag. Target: warm re-run on a
-  50k-LOC codebase < 1s (this is what makes IDE per-save invocation viable).
-- **6.2 Parallel indexing:** worker pool via `proc_open` of self with a hidden
-  `--worker` mode over file shards (no pcntl dependency — works on Windows CI). Decide
-  worker count from `nproc`, flag `--jobs`.
-- **6.3 Docs:** PhpStorm External Tool + File Watcher recipe (`docs/phpstorm.md`),
-  finalize `docs/ci.md`, README rewrite against the real tool output.
+**Detailed step-by-step plan: [docs/plans/phase-6.md](plans/phase-6.md)** — written
+against the shipped Phase 1–5 interfaces; where it refines the sketches below, the
+detailed plan wins. Tasks 1–5 (index cache, `--no-cache` + `cache` config key,
+PhpStorm recipe, docs release pass, this roadmap close-out) land on
+`feature/11-cache-and-release`; the v0.1.0 release (Task 6) follows the merge via the
+git-flow release process described in `CLAUDE.md` — not on this branch.
+
+- [x] **6.1 Index cache:** per-file serialized `MethodInfo[]` keyed by (path, mtime,
+  size, tool version) under `.phptramp.cache/`; `--no-cache` flag and `cache` config key.
+  Measured on `--folder vendor` (4,610 files / 601,867 lines): cold ≈ 19.6s → warm total
+  ≈ 4.5s with indexing ≈ 0 (all cache hits; the residual is chain-resolution + reporting).
+  Target was warm re-run on a 50k-LOC codebase < 1s — met, and IDE per-save invocation is
+  viable on the warm path.
+- **6.2 Parallel indexing:** deferred — **the data said no, not yet.** Measured cold
+  indexing is ≈ 19.6s for the 600k-LOC vendor tree (≈ 1.6s per 50k LOC), and warm
+  indexing with the 6.1 cache is ≈ 0 (all hits), so the per-file cache alone meets the
+  stated warm-run target; the `proc_open`-of-self worker pool (no pcntl dependency,
+  Windows-CI-friendly) is moved to the post-v0.1 roadmap with the measurement recorded.
+- [x] **6.3 Docs:** PhpStorm External Tool + File Watcher recipe shipped at
+  `docs/phpstorm.md`; `docs/ci.md` finalized and README release pass done against the
+  real tool output.
 - **6.4 Release:** (dogfood gating shipped early, in Phase 4) Packagist submission, tag
-  `v0.1.0`. Roadmap notes (explicit maybe-laters): `--follow-all-implementations`,
-  field/property tramping, native PhpStorm plugin, composer-plugin command package.
+  `v0.1.0` — follows the merge of this branch into `develop` via the git-flow release
+  process (see `CLAUDE.md`); not performed on this branch. The explicit maybe-laters
+  (roadmap notes) move to the `## Post-v0.1 roadmap` section below.
 
 ---
 
@@ -792,6 +806,31 @@ the detailed plan wins.
 2. `composer check` (cs + stan + md + test) green, tests green on 8.2/8.3/8.4 matrix.
 3. Help text (`Application::helpText`), README, and this plan agree with actual flags.
 4. No placeholder output ("TODO", "not implemented") reachable from shipped flags.
+
+---
+
+## Post-v0.1 roadmap
+
+Explicit maybe-laters recorded during Phases 0–6; each waits on a concrete consumer
+ask unless the measurement already says "not yet".
+
+- **`--follow-all-implementations`:** follow all N implementations of an interface
+  instead of the single-implementation default — fan-out counts are already recorded
+  since Phase 2 (see the single-implementation follow-through bullet in the Appendix),
+  so this is a small flag, not a rewrite. Origin: Phase 2 frozen-semantics decision.
+- **Field/property tramping:** constructor-stored values re-forwarded via properties
+  (the parameter is captured, not just passed). Today the classifier tracks parameter
+  forwarding, not property-mediated re-forwarding. Origin: Phase 0 "future work" note.
+- **Native PhpStorm plugin:** inline squiggles in the editor. The External Tool / File
+  Watcher recipe in `docs/phpstorm.md` is the stopgap. Origin: Phase 6.3 docs stopgap.
+- **Composer-plugin command package:** `composer tramp` without the per-project
+  script snippet. Origin: Option B from the Phase 0 design review.
+- **Parallel indexing:** the deferred 6.2 worker pool (`proc_open`-of-self over file
+  shards, `--jobs`). The measurement — cold ≈ 19.6s for the 600k-LOC vendor tree,
+  warm indexing ≈ 0 with the 6.1 cache — shows the cache alone meets the target, so
+  this is "the data said no, not yet", not descoped. Origin: Phase 6.2 deferral.
+- **`--fail-on-stale` config key:** CLI-only since Phase 5; add a `failOnStale` config
+  key on demand when a consumer asks for it. Origin: Phase 5.3 stale-detection design.
 
 ---
 

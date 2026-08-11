@@ -5,6 +5,8 @@ the chains your change touches, and marks exactly which hops are yours. Wire
 it into a PR pipeline with `--changed-only --git-base <ref>`; pipe an
 arbitrary diff with `--diff -`; or run it as a full-repo gate the way this
 project gates itself. All four patterns below are copy-paste starting points.
+For the IDE side (per-save runs in PhpStorm and friends) see
+[docs/phpstorm.md](phpstorm.md).
 
 ## GitHub Actions — PR job
 
