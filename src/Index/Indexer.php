@@ -57,11 +57,17 @@ final class Indexer
                 continue;
             }
 
-            $mergedMethods = array_merge($mergedMethods, $fileIndex->methods);
-            $mergedClasses = array_merge($mergedClasses, $fileIndex->classes);
+            foreach ($fileIndex->methods as $fqmn => $method) {
+                $mergedMethods[$fqmn] = $method;
+            }
+            foreach ($fileIndex->classes as $fqcn => $class) {
+                $mergedClasses[$fqcn] = $class;
+            }
             array_push($suppressedMethods, ...$fileIndex->suppressedMethods);
             array_push($suppressedParams, ...$fileIndex->suppressedParams);
-            $suppressedLines = array_merge($suppressedLines, $fileIndex->suppressedLines);
+            foreach ($fileIndex->suppressedLines as $suppressedFile => $lines) {
+                $suppressedLines[$suppressedFile] = $lines;
+            }
         }
 
         if ($errors !== []) {
