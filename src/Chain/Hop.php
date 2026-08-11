@@ -18,6 +18,8 @@ final class Hop
         public readonly int $line,
         /** Line of the forwarding call site; null on the terminal node. */
         public readonly ?int $forwardLine,
+        /** Whether this hop intersects the diff in diff-aware mode. */
+        public readonly bool $changed = false,
     ) {
     }
 }
