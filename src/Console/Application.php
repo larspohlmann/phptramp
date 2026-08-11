@@ -394,6 +394,9 @@ final class Application
               --generate-baseline <file>  Write current findings to a baseline file
               --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
 
+            Cache:
+              --no-cache                Disable the per-file index cache (default: on at .phptramp.cache/)
+
             Debugging:
               --dump-index              Print the classified method index as JSON and exit
 
@@ -406,16 +409,12 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 5 - baseline is shipped: --generate-baseline /
-            --baseline ignore refactor-stable findings recorded in the file,
-            and --fail-on-stale exits 1 when a baseline entry or suppression
-            matches nothing (full runs only — stale detection is skipped
-            under --changed-only). Phase 4 - diff-aware mode
-            (--changed-only / --git-base / --diff) reports only chains
-            touching the diff and marks which hops are yours, across all six
-            formats (text/json/github/checkstyle/sarif/summary).
-            phptramp.json config, #[TrampIgnore]/phptramp-ignore suppression,
-            and --warn-limit are wired up. See docs/plan.md.
+            Status: v0.1.0 — cross-file chain reporting (six formats), diff-aware
+            mode (--changed-only / --git-base / --diff), baselining
+            (--generate-baseline / --baseline / --fail-on-stale),
+            #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
+            config, --warn-limit, and a per-file index cache (--no-cache / the
+            `cache` config key) are all shipped. See docs/plan.md.
 
             TXT;
     }
