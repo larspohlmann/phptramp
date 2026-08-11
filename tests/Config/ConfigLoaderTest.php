@@ -158,13 +158,31 @@ final class ConfigLoaderTest extends TestCase
         (new ConfigLoader())->load($this->directory);
     }
 
-    public function testExcludeKeyIsAllowedButNotYetMapped(): void
+    public function testExcludeIsMapped(): void
     {
-        $this->writeConfig('phptramp.json', '{"exclude": ["vendor/*"]}');
+        $this->writeConfig('phptramp.json', '{"exclude": ["vendor/*", "*Test.php"]}');
 
         $options = (new ConfigLoader())->load($this->directory);
 
-        self::assertEquals(new Options(), $options);
+        self::assertSame(['vendor/*', '*Test.php'], $options->exclude);
+    }
+
+    public function testExcludeMustBeAList(): void
+    {
+        $this->writeConfig('phptramp.json', '{"exclude": "nope"}');
+
+        $this->expectException(ConfigException::class);
+
+        (new ConfigLoader())->load($this->directory);
+    }
+
+    public function testExcludeWithNonStringEntryThrows(): void
+    {
+        $this->writeConfig('phptramp.json', '{"exclude": ["vendor/*", 3]}');
+
+        $this->expectException(ConfigException::class);
+
+        (new ConfigLoader())->load($this->directory);
     }
 
     public function testFormatAndBaselineAreMapped(): void

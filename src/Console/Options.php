@@ -17,6 +17,7 @@ final class Options
     /**
      * @param list<string> $folders
      * @param list<string> $files
+     * @param list<string> $exclude
      */
     public function __construct(
         public readonly array $folders = [],
@@ -32,6 +33,7 @@ final class Options
         public readonly bool $dumpIndex = false,
         public readonly bool $help = false,
         public readonly bool $version = false,
+        public readonly array $exclude = [],
     ) {
     }
 }

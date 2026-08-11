@@ -13,17 +13,23 @@ use PhpTramp\Console\Options;
  */
 final class FileLocator
 {
+    public function __construct(private readonly string $workingDirectory)
+    {
+    }
+
     /**
      * @return list<string>
      */
     public function locate(Options $options): array
     {
-        /** @var array<string, true> $found */
-        $found = [];
+        /** @var array<string, true> $discovered */
+        $discovered = [];
 
         foreach ($options->folders as $folder) {
-            $this->collectFolder($folder, $found);
+            $this->collectFolder($folder, $discovered);
         }
+
+        $found = $this->withoutExcluded($discovered, $options->exclude);
 
         foreach ($options->files as $file) {
             $real = realpath($file);
@@ -37,6 +43,54 @@ final class FileLocator
         sort($paths);
 
         return $paths;
+    }
+
+    /**
+     * @param array<string, true> $discovered
+     * @param list<string> $exclude
+     * @return array<string, true>
+     */
+    private function withoutExcluded(array $discovered, array $exclude): array
+    {
+        $kept = [];
+        foreach ($discovered as $path => $true) {
+            if (! $this->isExcluded($path, $exclude)) {
+                $kept[$path] = $true;
+            }
+        }
+
+        return $kept;
+    }
+
+    /**
+     * @param list<string> $exclude
+     */
+    private function isExcluded(string $path, array $exclude): bool
+    {
+        $relative = $this->relativeToWorkingDirectory($path);
+
+        foreach ($exclude as $pattern) {
+            if (fnmatch($pattern, $relative)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function relativeToWorkingDirectory(string $path): string
+    {
+        $base = realpath($this->workingDirectory);
+        if ($base === false) {
+            return $path;
+        }
+
+        $prefix = $base . '/';
+        if (! str_starts_with($path, $prefix)) {
+            return $path;
+        }
+
+        return substr($path, strlen($prefix));
     }
 
     /**

@@ -51,6 +51,8 @@ final class ArgvParser
     private bool $help = false;
     private bool $version = false;
     private bool $clearedSeededPaths = false;
+    /** @var list<string> */
+    private array $exclude = [];
 
     /**
      * @param list<string> $args
@@ -79,6 +81,7 @@ final class ArgvParser
             dumpIndex: $this->dumpIndex,
             help: $this->help,
             version: $this->version,
+            exclude: $this->exclude,
         );
     }
 
@@ -97,6 +100,7 @@ final class ArgvParser
         $this->dumpIndex = $defaults->dumpIndex;
         $this->help = $defaults->help;
         $this->version = $defaults->version;
+        $this->exclude = $defaults->exclude;
         $this->clearedSeededPaths = false;
     }
 

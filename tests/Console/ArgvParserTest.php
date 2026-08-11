@@ -233,6 +233,13 @@ final class ArgvParserTest extends TestCase
         $this->parse('--nope=value');
     }
 
+    public function testSeededExcludeSurvivesWhenAbsentFromArgv(): void
+    {
+        $defaults = new Options(exclude: ['vendor/*']);
+
+        self::assertSame(['vendor/*'], (new ArgvParser())->parse([], $defaults)->exclude);
+    }
+
     public function testSeededNonPathDefaultsSurviveAlongsideExplicitFlags(): void
     {
         $defaults = new Options(format: 'json', gitBase: 'develop');

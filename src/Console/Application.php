@@ -116,7 +116,7 @@ final class Application
 
     private function buildIndex(Options $options): MethodIndex
     {
-        $files = (new FileLocator())->locate($options);
+        $files = (new FileLocator($this->workingDirectory()))->locate($options);
 
         return (new Indexer())->index($files);
     }
@@ -134,7 +134,7 @@ final class Application
     private function dumpIndex(Options $options): int
     {
         try {
-            $files = (new FileLocator())->locate($options);
+            $files = (new FileLocator($this->workingDirectory()))->locate($options);
             $index = (new Indexer())->index($files);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");

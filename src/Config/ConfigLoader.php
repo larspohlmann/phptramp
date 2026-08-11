@@ -84,6 +84,7 @@ final class ConfigLoader
 
         $folders = [];
         $files = [];
+        $exclude = $defaults->exclude;
         $limit = $defaults->limit;
         $warnLimit = $defaults->warnLimit;
         $format = $defaults->format;
@@ -92,7 +93,7 @@ final class ConfigLoader
         foreach ($config as $key => $value) {
             match ($key) {
                 'paths' => $this->assignPaths($value, $folders, $files),
-                'exclude' => null, // storage arrives in Task 5; allow-listed so it doesn't trip the unknown-key guard.
+                'exclude' => $exclude = $this->requireStringList('exclude', $value),
                 'limit' => $limit = $this->requireInt('limit', $value),
                 'warnLimit' => $warnLimit = $this->requireInt('warnLimit', $value),
                 'format' => $format = $this->requireString('format', $value),
@@ -108,6 +109,7 @@ final class ConfigLoader
             warnLimit: $warnLimit,
             format: $format,
             baseline: $baseline,
+            exclude: $exclude,
         );
     }
 
@@ -134,6 +136,26 @@ final class ConfigLoader
                 $folders[] = $path;
             }
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function requireStringList(string $key, mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            throw new ConfigException("config key \"{$key}\" must be a list of strings");
+        }
+
+        $strings = [];
+        foreach ($value as $entry) {
+            if (! is_string($entry)) {
+                throw new ConfigException("config key \"{$key}\" must be a list of strings");
+            }
+            $strings[] = $entry;
+        }
+
+        return $strings;
     }
 
     private function requireInt(string $key, mixed $value): int
