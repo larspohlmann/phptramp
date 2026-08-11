@@ -28,6 +28,14 @@ final class UsageClassifier
      */
     public function classify(array $params, ?array $stmts): array
     {
+        if ($stmts !== null) {
+            // Connect parents once for the whole body; every per-parameter walk
+            // below then reads the same `parent` attributes.
+            $connector = new NodeTraverser();
+            $connector->addVisitor(new ParentConnectingVisitor());
+            $connector->traverse($stmts);
+        }
+
         $out = [];
         foreach ($params as $position => $param) {
             $out[] = $this->classifyParam($param, $position, $stmts);
@@ -43,22 +51,19 @@ final class UsageClassifier
     {
         $name = ($param->var instanceof Variable && is_string($param->var->name)) ? $param->var->name : '';
         $type = $this->typeToString($param->type);
+        $forwards = [];
 
         if ($param->byRef) {
-            return new ParamInfo($name, $position, ParamFate::ByRefTerminated, [], true, $param->variadic, $type);
+            $fate = ParamFate::ByRefTerminated;
+        } elseif ($param->isPromoted()) {
+            $fate = ParamFate::Used;
+        } elseif ($stmts === null || $name === '') {
+            $fate = ParamFate::Unused;
+        } else {
+            [$fate, $forwards] = $this->analyzeBody($name, $param->variadic, $stmts);
         }
 
-        if ($param->isPromoted()) {
-            return new ParamInfo($name, $position, ParamFate::Used, [], false, $param->variadic, $type);
-        }
-
-        if ($stmts === null || $name === '') {
-            return new ParamInfo($name, $position, ParamFate::Unused, [], false, $param->variadic, $type);
-        }
-
-        [$fate, $forwards] = $this->analyzeBody($name, $param->variadic, $stmts);
-
-        return new ParamInfo($name, $position, $fate, $forwards, false, $param->variadic, $type);
+        return new ParamInfo($name, $position, $fate, $forwards, $param->byRef, $param->variadic, $type);
     }
 
     /**
@@ -70,7 +75,6 @@ final class UsageClassifier
     {
         $collector = new ForwardCollector($name, $variadic);
         $traverser = new NodeTraverser();
-        $traverser->addVisitor(new ParentConnectingVisitor());
         $traverser->addVisitor($collector);
         $traverser->traverse($stmts);
 
