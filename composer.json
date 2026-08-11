@@ -1,0 +1,46 @@
+{
+    "name": "larspohlmann/phptramp",
+    "description": "Static analyzer that detects tramp data: parameters passed through chains of PHP methods that never use them.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "static analysis",
+        "code quality",
+        "tramp data",
+        "dev",
+        "ci"
+    ],
+    "authors": [
+        {
+            "name": "Lars Pohlmann"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "nikic/php-parser": "^5.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.5 || ^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpTramp\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpTramp\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/phptramp"
+    ],
+    "scripts": {
+        "test": "phpunit",
+        "stan": "phpstan analyse --no-progress"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
