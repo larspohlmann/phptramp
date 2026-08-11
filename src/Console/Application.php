@@ -7,6 +7,7 @@ namespace PhpTramp\Console;
 use PhpTramp\Baseline\Baseline;
 use PhpTramp\Baseline\BaselineException;
 use PhpTramp\Baseline\BaselineFilter;
+use PhpTramp\Cache\FileIndexCache;
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Config\ConfigException;
@@ -300,8 +301,9 @@ final class Application
     private function buildIndex(Options $options): MethodIndex
     {
         $files = (new FileLocator($this->workingDirectory()))->locate($options);
+        $cache = $options->noCache ? null : new FileIndexCache($options->cacheDir);
 
-        return (new IndexerFactory())->fromOptions($options)->index($files);
+        return (new Indexer(cache: $cache))->index($files);
     }
 
     /**
@@ -317,8 +319,7 @@ final class Application
     private function dumpIndex(Options $options): int
     {
         try {
-            $files = (new FileLocator($this->workingDirectory()))->locate($options);
-            $index = (new IndexerFactory())->fromOptions($options)->index($files);
+            $index = $this->buildIndex($options);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
