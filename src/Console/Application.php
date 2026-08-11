@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Console;
 
+use PhpTramp\Baseline\Baseline;
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Config\ConfigException;
@@ -138,9 +139,69 @@ final class Application
             return 2;
         }
 
+        if ($options->generateBaseline !== null) {
+            return $this->generateBaseline($findings, $thresholds, $options->generateBaseline, $options->baseline);
+        }
+
         fwrite($this->stdout, $reporter->render($findings));
 
         return $this->hasError($findings, $thresholds) ? 1 : 0;
+    }
+
+    /**
+     * Generation is maintenance, not a gate: it reuses the filter chain up to
+     * the suppression step, collects the findings a reporter would show
+     * (errors and warnings — warnings excluded would resurface on every later
+     * run), and writes a baseline document. Exits 0 regardless of findings.
+     *
+     * @param list<Finding> $findings
+     */
+    private function generateBaseline(
+        array $findings,
+        Thresholds $thresholds,
+        string $baselinePath,
+        ?string $consumeBaseline,
+    ): int {
+        if ($consumeBaseline !== null) {
+            fwrite(
+                $this->stderr,
+                'phptramp: --baseline ignored while generating a new baseline' . "\n",
+            );
+        }
+
+        $reportedFindings = $this->reportedFindings($findings, $thresholds);
+        $written = @file_put_contents($baselinePath, Baseline::generate($reportedFindings));
+        if ($written === false) {
+            fwrite($this->stderr, 'phptramp: unable to write baseline to ' . $baselinePath . "\n");
+
+            return 2;
+        }
+
+        fwrite(
+            $this->stderr,
+            'baseline written: ' . $baselinePath
+            . ' (' . count($reportedFindings) . ' findings)' . "\n",
+        );
+
+        return 0;
+    }
+
+    /**
+     * The findings a reporter would show: severity is non-null (error or warning).
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function reportedFindings(array $findings, Thresholds $thresholds): array
+    {
+        $reported = [];
+        foreach ($findings as $finding) {
+            if ($thresholds->severityOf($finding) !== null) {
+                $reported[] = $finding;
+            }
+        }
+
+        return $reported;
     }
 
     /**

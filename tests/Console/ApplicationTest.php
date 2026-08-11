@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Tests\Console;
 
+use PhpTramp\Baseline\Baseline;
 use PhpTramp\Console\Application;
 use PHPUnit\Framework\TestCase;
 
@@ -332,6 +333,71 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
+    }
+
+    public function testGenerateBaselineWritesDocumentWithExpectedFingerprintsAndExitsZero(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $folder . '/baseline.json';
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+        ]);
+
+        self::assertSame(0, $exitCode);
+        self::assertSame('', self::contents($this->stdout));
+        self::assertStringContainsString(
+            'baseline written: ' . $baselineFile . ' (1 findings)',
+            self::contents($this->stderr),
+        );
+
+        $baseline = Baseline::fromJson((string) file_get_contents($baselineFile));
+        self::assertCount(1, $baseline->staleEntries([]));
+    }
+
+    public function testGenerateBaselineIncludesWarningsWhenWarnLimitIsSet(): void
+    {
+        $folder = $this->fixtureWithTwoHopChain();
+        $baselineFile = $folder . '/baseline.json';
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '2',
+            '--generate-baseline', $baselineFile,
+        ]);
+
+        self::assertSame(0, $exitCode);
+        $baseline = Baseline::fromJson((string) file_get_contents($baselineFile));
+        self::assertCount(1, $baseline->staleEntries([]));
+    }
+
+    public function testGenerateBaselineOnUnwritableTargetExitsTwoWithStderrMessage(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $folder,
+        ]);
+
+        self::assertSame(2, $exitCode);
+        self::assertStringContainsString('phptramp:', self::contents($this->stderr));
+        self::assertSame('', self::contents($this->stdout));
+    }
+
+    public function testGenerateBaselineIgnoresConsumeBaselineFlagWithStderrNote(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $folder . '/baseline.json';
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--baseline', $folder . '/old-baseline.json',
+            '--generate-baseline', $baselineFile,
+        ]);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('--baseline ignored', self::contents($this->stderr));
+        self::assertFileExists($baselineFile);
     }
 
     /**
