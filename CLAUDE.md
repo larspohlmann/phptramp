@@ -102,8 +102,10 @@ Enforced mechanically by `composer check` (and the PR mutation gate):
 - **Strict fixture-first TDD, one task per commit.** Write the failing test,
   confirm it fails for the expected reason, write the minimal code, go green,
   run `composer check`, commit. Never batch tasks into one commit.
-- **Conventional commits** (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`,
-  `ci:`); the body explains *why* when it is not obvious.
+- **Conventional commits, issue number in the type**: `feat(#123): title`
+  (also `fix`, `test`, `refactor`, `docs`, `ci`). Use the plain `type: title`
+  form only when the work has no associated issue. The body explains *why* when
+  it is not obvious.
 - **Semantics are frozen in [docs/plan.md](docs/plan.md).** If a case is not
   covered there, pick the conservative option (fewer findings), add a fixture
   documenting the choice, and flag it in the commit message — never improvise
