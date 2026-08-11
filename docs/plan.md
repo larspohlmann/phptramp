@@ -1,11 +1,14 @@
 # phptramp Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
-> (recommended) or superpowers:executing-plans to implement this plan task-by-task.
-> Steps use checkbox (`- [ ]`) syntax for tracking. Phase 1 is written at full
-> step-by-step granularity; Phases 2–6 are written at task granularity and each phase
-> MUST be expanded into a step-by-step TDD plan (`docs/plans/phase-N.md`, same
-> conventions as Phase 1 below) before its implementation starts.
+> **For agentic workers:** This plan is self-contained — it assumes no prior
+> conversation context and no specific tooling/skill ecosystem. Read "Working on this
+> repo" below before writing any code. Steps use checkbox (`- [ ]`) syntax for
+> tracking; check them off as you go. Phase 1 is written at full step-by-step
+> granularity; Phases 2–6 are written at task granularity and each phase MUST be
+> expanded into a step-by-step TDD plan (`docs/plans/phase-N.md`, same conventions and
+> the same level of literal detail as Phase 1 below) before its implementation starts.
+> If your environment provides plan-execution skills (e.g. superpowers'
+> subagent-driven-development), use them; if not, execute task-by-task in order.
 
 **Goal:** A Composer-installable static analyzer that reports *tramp data* — parameters
 passed through chains of PHP methods that never use them — usable as a pure CLI call, in
@@ -36,6 +39,33 @@ filters, not analysis shortcuts (chains cross files).
   whose product is semantic correctness, escaped mutants in classifier/resolver code
   are exactly the bugs users would hit. `composer check` runs cs+stan+md+test locally.
 - **Non-goal:** auto-fix. Never plan or implement it.
+
+---
+
+## Working on this repo
+
+Everything an implementer needs that is not code:
+
+- **Setup:** `composer update` (no lock file is committed — this is a library).
+  Verify with `composer check`; it must pass before you start and after every commit.
+- **Quality gate:** `composer check` = PHPCS (PSR-12) + PHPStan (level max) + PHPMD
+  (codesize) + PHPUnit. Individual: `composer cs` / `cs:fix` / `stan` / `md` / `test`.
+  CI (`.github/workflows/ci.yml`) runs tests on PHP 8.2/8.3/8.4, static analysis on
+  8.4, and diff-scoped Infection mutation testing (minMsi 80) on pull requests.
+- **Process — strict TDD, one task at a time:** write the failing test first, run it
+  and confirm it fails for the expected reason, implement the minimal code, run green,
+  run `composer check`, commit. Never write implementation code without a failing test.
+  Never batch multiple tasks into one commit.
+- **Commits:** imperative, conventional-commit style (`feat:`, `fix:`, `test:`,
+  `ci:`, `docs:`); body explains why when it isn't obvious. Push to `main` directly is
+  fine for now (single maintainer); if you open PRs, the mutation job gates them.
+- **Semantics questions:** the "Frozen core semantics" section below is the contract.
+  If a case is genuinely not covered there or in the Phase 2 algorithm specs, do not
+  improvise silently — pick the conservative option (fewer findings, truncate with a
+  note), add a fixture documenting the choice, and flag it in the commit message.
+- **When a phase is done:** run the "Self-review checklist" at the bottom of this file,
+  update this plan's checkboxes and status markers, then write `docs/plans/phase-N.md`
+  for the next phase before touching its code.
 
 ---
 
@@ -175,24 +205,113 @@ testable, and debuggable before any chain logic exists.
 ### Task 1.1: ArgvParser + Options
 
 **Files:**
-- Create: `src/Console/ArgvParser.php`, `src/Console/Options.php`
+- Create: `src/Console/ArgvParser.php`, `src/Console/Options.php`,
+  `src/Console/InvalidArgsException.php` (`extends \RuntimeException`)
 - Test: `tests/Console/ArgvParserTest.php`
 
 **Interfaces:**
-- Produces: `ArgvParser::parse(array $args): Options` (throws
-  `InvalidArgsException` with message for exit code 2);
-  `Options` readonly properties: `array $folders`, `array $files`, `int $limit = 3`,
-  `?int $warnLimit`, `string $format = 'text'`, `bool $explain`, `bool $changedOnly`,
-  `string $gitBase = 'origin/main'`, `?string $baseline`, `?string $generateBaseline`,
-  `bool $dumpIndex`, `bool $help`, `bool $version`.
+- Produces: `ArgvParser::parse(array $args): Options` — `$args` excludes the program
+  name (Application slices argv). Throws `InvalidArgsException`; Application catches
+  it, prints the message to stderr, exits 2.
+  `Options` readonly properties: `list<string> $folders = []`,
+  `list<string> $files = []`, `int $limit = 3`, `?int $warnLimit = null`,
+  `string $format = 'text'`, `bool $explain = false`, `bool $changedOnly = false`,
+  `string $gitBase = 'origin/main'`, `?string $baseline = null`,
+  `?string $generateBaseline = null`, `bool $dumpIndex = false`,
+  `bool $help = false`, `bool $version = false`.
 
-- [ ] **Step 1: Write failing tests** — `--folder a --folder b` accumulates;
-  `--files a.php,b.php` splits; `--limit 5` casts to int; `--limit x` throws;
-  unknown flag throws; `--file x.php` appends to `files`.
+- [ ] **Step 1: Write the failing tests** (`tests/Console/ArgvParserTest.php`):
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace PhpTramp\Tests\Console;
+
+use PhpTramp\Console\ArgvParser;
+use PhpTramp\Console\InvalidArgsException;
+use PhpTramp\Console\Options;
+use PHPUnit\Framework\TestCase;
+
+final class ArgvParserTest extends TestCase
+{
+    private function parse(string ...$args): Options
+    {
+        return (new ArgvParser())->parse(array_values($args));
+    }
+
+    public function testDefaults(): void
+    {
+        $o = $this->parse();
+        self::assertSame([], $o->folders);
+        self::assertSame([], $o->files);
+        self::assertSame(3, $o->limit);
+        self::assertNull($o->warnLimit);
+        self::assertSame('text', $o->format);
+        self::assertFalse($o->explain);
+        self::assertFalse($o->changedOnly);
+        self::assertSame('origin/main', $o->gitBase);
+        self::assertNull($o->baseline);
+        self::assertFalse($o->dumpIndex);
+    }
+
+    public function testFolderAccumulates(): void
+    {
+        self::assertSame(['a', 'b'], $this->parse('--folder', 'a', '--folder', 'b')->folders);
+    }
+
+    public function testFilesSplitsOnComma(): void
+    {
+        self::assertSame(['a.php', 'b.php'], $this->parse('--files', 'a.php,b.php')->files);
+    }
+
+    public function testFileAppendsToFiles(): void
+    {
+        self::assertSame(['a.php', 'b.php'], $this->parse('--file', 'a.php', '--file', 'b.php')->files);
+    }
+
+    public function testEqualsSyntaxWorks(): void
+    {
+        self::assertSame(5, $this->parse('--limit=5')->limit);
+    }
+
+    public function testLimitAsSeparateArg(): void
+    {
+        self::assertSame(7, $this->parse('--limit', '7')->limit);
+    }
+
+    public function testNonNumericLimitThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--limit', 'x');
+    }
+
+    public function testMissingValueThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--folder');
+    }
+
+    public function testUnknownFlagThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--nope');
+    }
+
+    public function testUnknownFormatThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--format', 'xml');
+    }
+}
+```
+
 - [ ] **Step 2:** `vendor/bin/phpunit --filter ArgvParserTest` → FAIL (class not found).
 - [ ] **Step 3:** Implement: a `while` loop over args; flags taking values read the next
-  element; `str_contains($arg, '=')` also supported (`--limit=5`).
-- [ ] **Step 4:** Test passes; `composer stan` green.
+  element; `--flag=value` split on the first `=`. Valid formats:
+  `text|json|github|checkstyle|sarif|summary`.
+- [ ] **Step 4:** Test passes; `composer check` green.
 - [ ] **Step 5:** Commit `feat: argv parser and options object`.
 
 ### Task 1.2: FileLocator
@@ -251,13 +370,150 @@ testable, and debuggable before any chain logic exists.
 4. Zero occurrences → `Unused`. Forwards only → `PureForward`. Any use → `Used`
    (forwards list kept anyway — Phase 4 needs call-site lines even for terminals).
 
-**Test cases (each later duplicated as a pipeline fixture):** pure single forward;
-forward + property read = Used; assignment = Used; return = Used; closure capture = Used;
-by-ref param; variadic spread forward; named-arg forward records arg name; two forwards
-of same param records two sites; `$this->x = $p` in constructor = Used(stored).
+- [ ] **Step 1: Write the failing tests** (`tests/Index/UsageClassifierTest.php`).
+  The helper wraps a method body in a class, runs the real Indexer over a temp file,
+  and returns the classified params — so these tests pin the *pipeline's* semantics,
+  not a mock's:
 
-- [ ] Steps per TDD: all tests red → implement visitor → green → stan green → commit
-  `feat: parameter usage classifier`.
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace PhpTramp\Tests\Index;
+
+use PhpTramp\Index\Indexer;
+use PhpTramp\Index\ParamFate;
+use PhpTramp\Index\ParamInfo;
+use PHPUnit\Framework\TestCase;
+
+final class UsageClassifierTest extends TestCase
+{
+    /** @return array<string, ParamInfo> keyed by param name, for method C::m */
+    private function classify(string $body, string $params = 'Cfg $p'): array
+    {
+        $code = "<?php class Cfg {} class C { public function m({$params}) { {$body} } }";
+        $file = tempnam(sys_get_temp_dir(), 'phptramp') . '.php';
+        file_put_contents($file, $code);
+        try {
+            $method = (new Indexer())->index([$file])->get('C::m');
+            self::assertNotNull($method);
+            $byName = [];
+            foreach ($method->params as $param) {
+                $byName[$param->name] = $param;
+            }
+
+            return $byName;
+        } finally {
+            unlink($file);
+        }
+    }
+
+    public function testPureSingleForwardIsPureForward(): void
+    {
+        $p = $this->classify('other($p);')['p'];
+        self::assertSame(ParamFate::PureForward, $p->fate);
+        self::assertCount(1, $p->forwards);
+    }
+
+    public function testForwardPlusPropertyReadIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('log($p->env); other($p);')['p']->fate);
+    }
+
+    public function testMethodCallOnParamIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('$p->run();')['p']->fate);
+    }
+
+    public function testAssignmentFromParamIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('$x = $p; other($p);')['p']->fate);
+    }
+
+    public function testReassignmentOfParamIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('$p = null; other($p);')['p']->fate);
+    }
+
+    public function testReturnIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('return $p;')['p']->fate);
+    }
+
+    public function testStringInterpolationIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('echo "x{$p}";')['p']->fate);
+    }
+
+    public function testClosureCaptureIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('$f = function () use ($p) { other($p); };')['p']->fate);
+    }
+
+    public function testArrowFnBodyReferenceIsUsed(): void
+    {
+        self::assertSame(ParamFate::Used, $this->classify('$f = fn () => other($p);')['p']->fate);
+    }
+
+    public function testByRefParamIsByRefTerminated(): void
+    {
+        self::assertSame(ParamFate::ByRefTerminated, $this->classify('other($p);', 'Cfg &$p')['p']->fate);
+    }
+
+    public function testVariadicSpreadForwardIsPureForward(): void
+    {
+        self::assertSame(ParamFate::PureForward, $this->classify('other(...$p);', 'Cfg ...$p')['p']->fate);
+    }
+
+    public function testNamedArgForwardRecordsArgName(): void
+    {
+        $p = $this->classify('other(cfg: $p);')['p'];
+        self::assertSame(ParamFate::PureForward, $p->fate);
+        self::assertSame('cfg', $p->forwards[0]->argKey);
+    }
+
+    public function testPositionalForwardRecordsPosition(): void
+    {
+        $p = $this->classify('other(1, $p);')['p'];
+        self::assertSame(1, $p->forwards[0]->argKey);
+    }
+
+    public function testTwoForwardsRecordTwoSites(): void
+    {
+        $p = $this->classify('a($p); b($p);')['p'];
+        self::assertSame(ParamFate::PureForward, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardIntoNestedCallIsForwardToInnerCallee(): void
+    {
+        // $p is an argument of wrap(), not of outer(): the edge goes to wrap().
+        $p = $this->classify('outer(wrap($p));')['p'];
+        self::assertSame(ParamFate::PureForward, $p->fate);
+        self::assertCount(1, $p->forwards);
+    }
+
+    public function testConstructorArgForwardIsPureForward(): void
+    {
+        self::assertSame(ParamFate::PureForward, $this->classify('new Cfg($p);')['p']->fate);
+    }
+
+    public function testUntouchedParamIsUnused(): void
+    {
+        self::assertSame(ParamFate::Unused, $this->classify('log(1);')['p']->fate);
+    }
+}
+```
+
+  Plus one test outside the helper (own code string) pinning frozen rule 3:
+  a constructor body `$this->x = $p;` → `Used`; same for a promoted property
+  `public function __construct(private Cfg $p) {}` → `Used`.
+
+- [ ] **Step 2:** run → all red (enum/classes missing).
+- [ ] **Step 3:** implement the visitor per the algorithm above.
+- [ ] **Step 4:** all green; `composer check` green.
+- [ ] **Step 5:** Commit `feat: parameter usage classifier`.
 
 ### Task 1.5: `--dump-index` wiring + fixture harness
 
@@ -270,6 +526,81 @@ of same param records two sites; `$this->x = $p` in constructor = Used(stored).
   `{"methods": {"<fqmn>": {"file": ..., "params": [{"name","fate","forwards":[...]}]}}}`;
   the `FixtureTest` harness described above (Phase 1 variant compares `--dump-index`
   output; Phase 2 extends it to findings/`expected.json`).
+
+**Fixture (verbatim):** `tests/fixtures/classifier-smoke/src/Demo.php` — the README
+chain, which Phase 2 will reuse for the first end-to-end finding:
+
+```php
+<?php
+
+namespace Demo;
+
+class Cfg
+{
+}
+
+class Controller
+{
+    public function handle(Cfg $config): void
+    {
+        (new ServiceA())->process($config);
+    }
+}
+
+class ServiceA
+{
+    public function process(Cfg $config): void
+    {
+        (new ServiceB())->run($config);
+    }
+}
+
+class ServiceB
+{
+    public function run(Cfg $config): void
+    {
+        new Mailer($config);
+    }
+}
+
+class Mailer
+{
+    private Cfg $config;
+
+    public function __construct(Cfg $config)
+    {
+        $this->config = $config;
+    }
+}
+```
+
+`expected-index.json` (paths relative to the fixture dir; forwards show
+`kind:callee@argKey`):
+
+```json
+{
+    "methods": {
+        "Demo\\Controller::handle": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "PureForward", "forwards": ["method:process@0"]}]
+        },
+        "Demo\\ServiceA::process": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "PureForward", "forwards": ["method:run@0"]}]
+        },
+        "Demo\\ServiceB::run": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "PureForward", "forwards": ["new:Demo\\Mailer@0"]}]
+        },
+        "Demo\\Mailer::__construct": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "Used", "forwards": []}]
+        }
+    }
+}
+```
+
+(Methods with no params are omitted from `--dump-index` output to keep it stable.)
 
 - [ ] Steps: failing fixture test → wire pipeline in Application → green → commit
   `feat: --dump-index and fixture harness`. **Phase exit:** CI matrix green.
@@ -286,17 +617,52 @@ Tasks (expand to steps in `docs/plans/phase-2.md` before starting):
   concrete implementations across the whole index; expose
   `implementationsOf(string $iface): list<string>`.
   Fixtures: trait method chain; interface with one impl; interface with two impls.
-- **2.2 CallResolver:** `resolve(CalleeRef, MethodInfo $context): Resolution` where
-  `Resolution = target FQMN | Truncation(reason)`. Rules table = frozen semantics 5–7.
-  Receiver typing sources, in order: `$this`, parameter declared types, typed property
-  of `$this`, `new X` assigned to local (single assignment only). Named args map via
-  target signature. Unresolvable → `Truncation('dynamic call'| 'untyped receiver' | ...)`.
-- **2.3 ChainBuilder:** build edge set `(callerFqmn, param) --forward--> (calleeFqmn,
-  param)` from all `PureForward` params via CallResolver. Origins = nodes with no
-  incoming edge. DFS from each origin with visited set (frozen rule 8); at each end
-  emit `Finding{param, origin, terminal|truncation, hops, chain[], classes, notes}`.
-  Hops = count of PureForward nodes on the path. Terminal kinds: `used`, `stored`
-  (single assignment to property), `&-terminated`, `truncated:<reason>`, `unused-end`.
+- **2.2 CallResolver:** `resolve(ForwardSite $site, MethodInfo $caller): Resolution`
+  where `Resolution = Target(fqmn, boundParamName) | External | Truncation(reason)`.
+  **`External` is a semantic decision, not an error:** a forward whose target is not in
+  the index (`sprintf`, vendor code, unknown class) *terminates the chain like a use*
+  — the value left analyzed code, and we cannot call the callee a mindless hop.
+  Resolution rules, in order, per `CalleeRef.kind`:
+  1. `function`: try the namespaced name, then the global fallback (NameResolver
+     provides both). In index → Target; not in index → External.
+  2. `static` (`Cls::m`, `self::m`, `static::m`, `parent::m`): resolve the class name
+     (`self`/`static` → current class — late static binding is approximated by the
+     current class in v0.1; `parent` → parent class), then walk up the parent chain
+     for the method. Class unknown → External; class known, method not found →
+     Truncation(`method not found`).
+  3. `method` on a receiver: type the receiver from, in order: `$this` (current
+     class), an inline `(new X(...))` receiver expression, a parameter's declared
+     type, a typed property of `$this`, a local assigned exactly once from `new X`.
+     Untypeable → Truncation(`untyped receiver`).
+     Receiver type is a class in index → parent-chain method lookup. Interface or
+     abstract → `ClassHierarchy::implementationsOf()`: exactly 1 → that
+     implementation; 0 → External; N → Truncation(`N implementations`). Union or
+     intersection type → Truncation(`union type`). Type not in index → External.
+  4. `new`: constructor lookup with parent-chain walk; class not in index or no
+     constructor found → External.
+  Arg binding on Target: named arg → param by name; positional → position, with all
+  positions ≥ the variadic collector's position binding to the variadic param.
+  Named/positional arg matching no param → Truncation(`arg mismatch`).
+- **2.3 ChainBuilder:** Nodes are `(fqmn, paramName)`. For every param with fate
+  `PureForward` and each of its ForwardSites, resolve: `Target` → edge to
+  `(target, boundParam)`; `External`/`Truncation` → a terminal leaf attached to that
+  site. Then:
+  1. **Origins** = `PureForward` nodes with no incoming edge. After the main pass, any
+     unvisited `PureForward` node that has edges (an entry-less cycle) is also taken
+     as an origin and its finding gets a `(recursive)` note.
+  2. **DFS** from each origin, current path as the visited set (frozen rule 8 — a node
+     already on the path ends the branch with a `(recursive)` note).
+  3. **Branching:** every outgoing edge is explored; each root-to-terminal path is its
+     own Finding. A param forwarded to two callees therefore yields two findings —
+     they share the origin but differ in terminal, which is what the baseline
+     fingerprint keys on.
+  4. **Terminals:** child fate `Used` → terminal kind `used` (or `stored` when the
+     body is a single property assignment); `ByRefTerminated` → `&-terminated`;
+     `Unused` → `unused-end` (dead forwarding — the value goes nowhere); leaf from
+     resolution → `external` or `truncated:<reason>`.
+  5. **Hops** = count of `PureForward` nodes on the path (terminal never counted).
+     `Finding{param, origin, terminal, terminalKind, hops, chain[], classes, notes}`;
+     `classes` = distinct declaring classes across chain incl. terminal.
 - **2.4 TextReporter + exit codes + `--explain`:** render as in README example;
   `--explain` appends per-finding the Truncation/resolution trace. Exit 1 iff any
   finding with terminal != truncated? No — exit 1 iff hops ≥ limit regardless of
@@ -387,3 +753,57 @@ intersecting the diff and marks which hops are the user's.
 2. `composer check` (cs + stan + md + test) green, tests green on 8.2/8.3/8.4 matrix.
 3. Help text (`Application::helpText`), README, and this plan agree with actual flags.
 4. No placeholder output ("TODO", "not implemented") reachable from shipped flags.
+
+---
+
+## Appendix: design rationale (why the frozen decisions are what they are)
+
+Recorded so a future implementer can make *aligned* trade-offs when hitting a wall,
+instead of guessing.
+
+- **Standalone on php-parser, not a PHPStan extension:** the product is cross-file
+  *chain reporting* with its own CLI (`--folder/--file/--limit`, diff mode). PHPStan's
+  node-local rule/collector model and fixed CLI fight that shape. Cost accepted:
+  shallower type resolution — fine, because pure-forward detection mostly needs
+  declared parameter types and `$this`.
+- **No symfony/console (or any second prod dependency):** phptramp is a `require-dev`
+  tool; every dependency is a potential version conflict inside consumer projects.
+  A ~100-line argv parser is cheaper than a dependency forever.
+- **Pure-forward-only hop definition:** the moment "partly used but also forwarded"
+  counts, false positives explode and CI trust dies. A crisp definition ("this method
+  had no business seeing this value") survives arguments in code review. Mixed
+  use+forward can become an opt-in strict mode later without breaking anything.
+- **By-ref receipt terminates:** the callee may write to it — calling that a mindless
+  hop would be a false positive. Conservative beats clever everywhere in this tool.
+- **External targets terminate (not truncate):** forwarding into `sprintf` or vendor
+  code is the value being *consumed* from our perspective; reporting it as a
+  suspicious dead end would spam every codebase.
+- **Single-implementation interface follow-through:** DI codebases route everything
+  through interfaces; ending chains there guts the tool. Following all N
+  implementations turns one report into N near-duplicates. Exactly-one is the
+  overwhelmingly common DI case and costs near-zero false positives. Fan-out counts
+  are recorded so `--follow-all-implementations` stays a small feature, not a rewrite.
+- **Hops-only metric, default 3:** hops measure the smell itself (methods that had no
+  business seeing the value); total chain length and class counts vary with codebase
+  style. Three is the conventional rule-of-three refactoring threshold.
+- **Any-hop diff intersection:** the flagship CI finding is "your edit made an
+  existing chain longer" — the new hop is in the diff, the rest of the chain is not,
+  so origin-only or new-chains-only filtering would miss it.
+- **Baseline fingerprint excludes lines and intermediate hops:** baselines must
+  survive refactors; line numbers churn on every edit, and intermediate hops change
+  when someone *shortens* a chain (which should count as progress, not as a new
+  finding).
+- **Whole-project indexing even for `--file`/`--changed-only`:** chains cross files;
+  a per-file analysis cannot know a forward is hop 3 of 5. Speed comes from the
+  Phase 6 cache, never from narrowing analysis scope.
+- **No auto-fix, ever:** fixing tramp data means refactoring (parameter objects, DI
+  rewiring) — not mechanically safe, and a half-right auto-fix destroys trust faster
+  than no auto-fix.
+- **Fixture-first testing:** the product *is* its semantics; every rule lives as an
+  input codebase + expected output pair, so semantic regressions are structurally
+  hard to ship. Mutation testing (Infection, diff-scoped, minMsi 80) guards the
+  classifier/resolver where an escaped mutant literally equals a wrong finding.
+- **Toolchain provenance:** PHPCS (PSR-12), PHPMD (codesize-only — complexity metrics
+  are the one thing PHPStan max + PSR-12 don't cover), and diff-scoped Infection were
+  adopted from the maintainer's simple-feed-reader project, including its hard-won
+  CI comments (PR-only mutation, `--ignore-msi-with-no-mutations`, PCOV).
