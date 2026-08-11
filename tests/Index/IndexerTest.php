@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Tests\Index;
 
+use PhpTramp\Index\ClassKind;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParseException;
@@ -127,6 +128,44 @@ final class IndexerTest extends TestCase
         self::assertSame('Demo\Base', $service->parent);
         self::assertSame(['Demo\Handler'], $service->interfaces);
         self::assertSame(['Demo\Logs'], $service->traits);
+    }
+
+    public function testRecordsClassKindForEveryDeclarationShape(): void
+    {
+        $code = <<<'PHP'
+            <?php
+
+            namespace Demo;
+
+            class Concrete
+            {
+            }
+
+            abstract class Abstracted
+            {
+            }
+
+            interface Contract
+            {
+            }
+
+            trait Helper
+            {
+            }
+
+            enum Suit
+            {
+                case Hearts;
+            }
+            PHP;
+
+        $index = $this->index($code);
+
+        self::assertSame(ClassKind::ConcreteClass, $index->classInfo('Demo\Concrete')?->kind);
+        self::assertSame(ClassKind::AbstractClass, $index->classInfo('Demo\Abstracted')?->kind);
+        self::assertSame(ClassKind::Interface_, $index->classInfo('Demo\Contract')?->kind);
+        self::assertSame(ClassKind::Trait_, $index->classInfo('Demo\Helper')?->kind);
+        self::assertSame(ClassKind::Enum_, $index->classInfo('Demo\Suit')?->kind);
     }
 
     public function testParseErrorThrowsParseException(): void

@@ -17,6 +17,7 @@ final class ClassInfo
      */
     public function __construct(
         public readonly string $name,
+        public readonly ClassKind $kind,
         public readonly ?string $parent,
         public readonly array $interfaces,
         public readonly array $traits,

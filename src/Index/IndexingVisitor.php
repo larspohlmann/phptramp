@@ -13,6 +13,7 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Interface_;
+use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeVisitorAbstract;
 
@@ -25,7 +26,7 @@ use PhpParser\NodeVisitorAbstract;
  * Relies on NameResolver (FQ names) and ParentConnectingVisitor (the `parent`
  * attribute) running before it in the traverser.
  *
- * @phpstan-type ClassFacts array{parent: ?string, interfaces: list<string>, traits: list<string>}
+ * @phpstan-type ClassFacts array{kind: ClassKind, parent: ?string, interfaces: list<string>, traits: list<string>}
  * @phpstan-type PendingMethod array{fqmn: string, file: string, line: int, class: ?string, node: FunctionLike}
  */
 final class IndexingVisitor extends NodeVisitorAbstract
@@ -75,6 +76,7 @@ final class IndexingVisitor extends NodeVisitorAbstract
         foreach ($this->classes as $fqcn => $facts) {
             $out[$fqcn] = new ClassInfo(
                 $fqcn,
+                $facts['kind'],
                 $facts['parent'],
                 $facts['interfaces'],
                 $facts['traits'],
@@ -104,10 +106,22 @@ final class IndexingVisitor extends NodeVisitorAbstract
         }
 
         $this->classes[$fqcn] = [
+            'kind' => $this->kindOf($node),
             'parent' => $parent,
             'interfaces' => $interfaces,
             'traits' => [],
         ];
+    }
+
+    private function kindOf(ClassLike $node): ClassKind
+    {
+        return match (true) {
+            $node instanceof Interface_ => ClassKind::Interface_,
+            $node instanceof Trait_ => ClassKind::Trait_,
+            $node instanceof Enum_ => ClassKind::Enum_,
+            $node instanceof Class_ && $node->isAbstract() => ClassKind::AbstractClass,
+            default => ClassKind::ConcreteClass,
+        };
     }
 
     private function recordTraitUse(TraitUse $node): void
