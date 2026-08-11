@@ -4,4 +4,4 @@
 /.idea/
 /infection.log
 /.superpowers/
-/.phptramp.cache/
+.phptramp.cache/
