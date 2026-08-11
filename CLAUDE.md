@@ -110,3 +110,27 @@ Enforced mechanically by `composer check` (and the PR mutation gate):
   silently.
 - **No second production dependency, and no auto-fix — ever** (both are
   deliberate, documented non-goals).
+
+## Workflow
+
+- **git-flow.** Feature branches off `develop`; PRs merge into `develop`, never
+  `main`. Every merge to `develop` is shippable. `main` only ever moves through a
+  release. The AVH git-flow config is committed (`git flow feature start …`,
+  `git flow release start …`).
+- **Branch names embed the GitHub issue number**: `feature/2-chain-stitching`,
+  `fix/17-untyped-receiver`.
+- `develop` is the repository's **default branch**, so a PR whose body says
+  `Closes #NN` **auto-closes the issue on merge**. Keep writing `Closes #NN`;
+  after a merge, verify the issue closed rather than closing it by hand.
+- **Releases are tag-triggered.** Pushing a plain `vX.Y.Z` tag on a `main` commit
+  runs [`.github/workflows/release.yml`](.github/workflows/release.yml). It
+  guards that the commit is on `main` and that CI was green on that exact SHA,
+  publishes a GitHub Release whose notes are generated from the pull requests
+  merged since the previous tag, writes those notes into
+  [`CHANGELOG.md`](CHANGELOG.md) as a new version section, and carries that
+  commit back onto `develop` so the two branches never drift. The workflow runs
+  as it exists *at that tag*.
+- **This is a library: `composer.lock` is not committed** (a global gitignore
+  hides it and this repo keeps it that way). Run `composer update` to install.
+- Concurrent Claude sessions can share this checkout — **check before any
+  `checkout`, `reset`, or `stash`**; another session may be mid-edit.
