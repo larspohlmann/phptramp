@@ -20,12 +20,14 @@ final class SarifReporter implements Reporter
         . 'sarif-schema-2.1.0.json';
 
     private readonly FindingMessage $message;
+    private readonly JsonEncoder $encoder;
 
     public function __construct(
         private readonly Thresholds $thresholds,
         private readonly Paths $paths,
     ) {
         $this->message = new FindingMessage();
+        $this->encoder = new JsonEncoder();
     }
 
     /**
@@ -39,7 +41,7 @@ final class SarifReporter implements Reporter
             'runs' => [$this->run($findings)],
         ];
 
-        return $this->encode($document) . "\n";
+        return $this->encoder->encode($document, 'SARIF') . "\n";
     }
 
     /**
@@ -131,21 +133,5 @@ final class SarifReporter implements Reporter
                 'region' => ['startLine' => $hop->line],
             ],
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $document
-     */
-    private function encode(array $document): string
-    {
-        $json = json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($json === false) {
-            // Unreachable: $document is built entirely from scalars, strings, and
-            // arrays thereof — nothing here can produce a resource or invalid
-            // UTF-8 that would make json_encode fail.
-            throw new JsonEncodingException('Failed to encode findings as SARIF.');
-        }
-
-        return $json;
     }
 }

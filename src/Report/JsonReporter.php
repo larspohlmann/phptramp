@@ -13,10 +13,13 @@ use PhpTramp\Chain\Finding;
  */
 final class JsonReporter implements Reporter
 {
+    private readonly JsonEncoder $encoder;
+
     public function __construct(
         private readonly Thresholds $thresholds,
         private readonly Paths $paths,
     ) {
+        $this->encoder = new JsonEncoder();
     }
 
     /**
@@ -30,7 +33,7 @@ final class JsonReporter implements Reporter
             'findings' => $this->findingDocuments($findings),
         ];
 
-        return $this->encode($document) . "\n";
+        return $this->encoder->encode($document, 'JSON') . "\n";
     }
 
     /**
@@ -101,21 +104,5 @@ final class JsonReporter implements Reporter
         }
 
         return 'hop';
-    }
-
-    /**
-     * @param array<string, mixed> $document
-     */
-    private function encode(array $document): string
-    {
-        $json = json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($json === false) {
-            // Unreachable: $document is built entirely from scalars, strings, and
-            // arrays thereof — nothing here can produce a resource or invalid
-            // UTF-8 that would make json_encode fail.
-            throw new JsonEncodingException('Failed to encode findings as JSON.');
-        }
-
-        return $json;
     }
 }
