@@ -17,6 +17,19 @@ final class ApplicationTest extends TestCase
 
     private Application $app;
 
+    /** @var list<string> */
+    private array $folders = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->folders as $folder) {
+            array_map('unlink', glob($folder . '/*') ?: []);
+            if (is_dir($folder)) {
+                rmdir($folder);
+            }
+        }
+    }
+
     protected function setUp(): void
     {
         $stdout = fopen('php://memory', 'w+');
@@ -68,10 +81,44 @@ final class ApplicationTest extends TestCase
         self::assertStringContainsString('Usage:', self::contents($this->stdout));
     }
 
-    public function testUnimplementedInvocationExitsWithToolErrorCode(): void
+    public function testDefaultRunReportsChainsAndExitsOne(): void
     {
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', 'src']));
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder]));
+        self::assertStringContainsString('FINDING', self::contents($this->stdout));
+    }
+
+    public function testLimitAboveChainLengthReportsNothingAndExitsZero(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(0, $this->app->run(['phptramp', '--folder', $folder, '--limit', '4']));
+        self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
+    }
+
+    public function testUnsupportedFormatExitsWithToolErrorCode(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'json']));
         self::assertStringContainsString('not implemented', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
+    }
+
+    private function fixtureWithThreeHopChain(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { public function process(Cfg $config): void { (new ServiceB())->run($config); } } '
+            . 'class ServiceB { public function run(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
     }
 }

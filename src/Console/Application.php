@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace PhpTramp\Console;
 
+use PhpTramp\Chain\ChainBuilder;
+use PhpTramp\Chain\Finding;
 use PhpTramp\Discovery\FileLocator;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
+use PhpTramp\Report\TextReporter;
+use PhpTramp\Resolve\CallResolver;
+use PhpTramp\Resolve\ClassHierarchy;
 
 final class Application
 {
@@ -63,9 +68,47 @@ final class Application
             return $this->dumpIndex($options);
         }
 
-        fwrite($this->stderr, "phptramp: chain analysis is not implemented yet (Phase 1). See docs/plan.md.\n");
+        return $this->analyze($options);
+    }
 
-        return 2;
+    private function analyze(Options $options): int
+    {
+        if ($options->format !== 'text') {
+            fwrite($this->stderr, "phptramp: format '{$options->format}' is not implemented until Phase 3.\n");
+
+            return 2;
+        }
+
+        try {
+            $index = $this->buildIndex($options);
+        } catch (InvalidArgsException | ParseException $e) {
+            fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
+
+            return 2;
+        }
+
+        $findings = $this->findChains($index, $options->limit);
+        fwrite($this->stdout, (new TextReporter($options->limit))->render($findings));
+
+        return $findings === [] ? 0 : 1;
+    }
+
+    private function buildIndex(Options $options): MethodIndex
+    {
+        $files = (new FileLocator())->locate($options);
+
+        return (new Indexer())->index($files);
+    }
+
+    /**
+     * @return list<Finding>
+     */
+    private function findChains(MethodIndex $index, int $limit): array
+    {
+        $resolver = new CallResolver($index, new ClassHierarchy($index));
+        $findings = (new ChainBuilder($resolver))->build($index);
+
+        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->hops >= $limit));
     }
 
     private function dumpIndex(Options $options): int
@@ -158,8 +201,8 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 1 - classifier and --dump-index shipped; chain analysis
-            (default reporting) lands in Phase 2. See docs/plan.md.
+            Status: Phase 2 - cross-file chain reporting works in the text format;
+            other formats land in Phase 3. See docs/plan.md.
 
             TXT;
     }
