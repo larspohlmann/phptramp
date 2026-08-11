@@ -22,6 +22,7 @@ final class TextReporter implements Reporter
 
     public function __construct(
         private readonly Thresholds $thresholds,
+        private readonly Paths $paths,
         private readonly bool $explain = false,
     ) {
         $this->pluralizer = new Pluralizer();
@@ -134,7 +135,7 @@ final class TextReporter implements Reporter
 
     private function location(Hop $hop): string
     {
-        return $hop->file . ':' . $hop->line;
+        return $this->paths->relativize($hop->file) . ':' . $hop->line;
     }
 
     /**

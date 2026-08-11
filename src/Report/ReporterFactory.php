@@ -18,7 +18,7 @@ final class ReporterFactory
         $thresholds = new Thresholds($options->limit, $options->warnLimit);
 
         return match ($options->format) {
-            'text' => new TextReporter($thresholds, $options->explain),
+            'text' => new TextReporter($thresholds, new Paths($this->workingDirectory), $options->explain),
             'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory)),
             'github' => new GithubReporter($thresholds, new Paths($this->workingDirectory)),
             'checkstyle' => new CheckstyleReporter($thresholds, new Paths($this->workingDirectory)),

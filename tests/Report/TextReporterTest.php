@@ -7,6 +7,7 @@ namespace PhpTramp\Tests\Report;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Chain\Hop;
 use PhpTramp\Chain\TerminalKind;
+use PhpTramp\Report\Paths;
 use PhpTramp\Report\TextReporter;
 use PhpTramp\Report\Thresholds;
 use PHPUnit\Framework\TestCase;
@@ -44,7 +45,9 @@ final class TextReporterTest extends TestCase
 
             TXT;
 
-        self::assertSame($expected, (new TextReporter(new Thresholds(3, null)))->render([$finding]));
+        $reporter = new TextReporter(new Thresholds(3, null), new Paths('/nonexistent-root'));
+
+        self::assertSame($expected, $reporter->render([$finding]));
     }
 
     public function testRendersTruncatedChainWithNoteLineAndNoTerminal(): void
@@ -75,7 +78,9 @@ final class TextReporterTest extends TestCase
 
             TXT;
 
-        self::assertSame($expected, (new TextReporter(new Thresholds(2, null)))->render([$finding]));
+        $reporter = new TextReporter(new Thresholds(2, null), new Paths('/nonexistent-root'));
+
+        self::assertSame($expected, $reporter->render([$finding]));
     }
 
     public function testRendersSingularFormsForOneHopOneClassOneFinding(): void
@@ -95,7 +100,9 @@ final class TextReporterTest extends TestCase
 
             TXT;
 
-        self::assertSame($expected, (new TextReporter(new Thresholds(1, null)))->render([$finding]));
+        $reporter = new TextReporter(new Thresholds(1, null), new Paths('/nonexistent-root'));
+
+        self::assertSame($expected, $reporter->render([$finding]));
     }
 
     public function testExplainAppendsTraceLinesUnderHeader(): void
@@ -118,7 +125,9 @@ final class TextReporterTest extends TestCase
 
             TXT;
 
-        self::assertSame($expected, (new TextReporter(new Thresholds(1, null), true))->render([$finding]));
+        $reporter = new TextReporter(new Thresholds(1, null), new Paths('/nonexistent-root'), true);
+
+        self::assertSame($expected, $reporter->render([$finding]));
     }
 
     public function testExplainDisabledOmitsTraceEvenWhenPresent(): void
@@ -130,7 +139,7 @@ final class TextReporterTest extends TestCase
         $trace = ['Demo\A::go: method:step -> Demo\B::step'];
         $finding = new Finding('p', 'Demo\A::go', 'Demo\B::step', TerminalKind::Used, 1, $chain, 2, [], $trace);
 
-        $reporter = new TextReporter(new Thresholds(1, null));
+        $reporter = new TextReporter(new Thresholds(1, null), new Paths('/nonexistent-root'));
 
         self::assertStringNotContainsString('explain:', $reporter->render([$finding]));
     }
@@ -139,7 +148,7 @@ final class TextReporterTest extends TestCase
     {
         self::assertSame(
             "No tramp data found (limit: 3 hops).\n",
-            (new TextReporter(new Thresholds(3, null)))->render([]),
+            (new TextReporter(new Thresholds(3, null), new Paths('/nonexistent-root')))->render([]),
         );
     }
 
@@ -176,9 +185,21 @@ final class TextReporterTest extends TestCase
 
             TXT;
 
-        $reporter = new TextReporter(new Thresholds(3, 2));
+        $reporter = new TextReporter(new Thresholds(3, 2), new Paths('/nonexistent-root'));
 
         self::assertSame($expected, $reporter->render([$warningFinding, $belowWarnLimitFinding]));
+    }
+
+    public function testRelativizesAbsoluteFilePathUnderWorkingDirectory(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', '/tmp/project/src/Demo.php', 5, null),
+        ];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\A::go', TerminalKind::Used, 1, $chain, 1, [], []);
+
+        $reporter = new TextReporter(new Thresholds(1, null), new Paths('/tmp/project'));
+
+        self::assertStringContainsString('src/Demo.php:5', $reporter->render([$finding]));
     }
 
     public function testRendersMixedErrorAndWarningFindingsWithCombinedSummary(): void
@@ -223,7 +244,7 @@ final class TextReporterTest extends TestCase
 
             TXT;
 
-        $reporter = new TextReporter(new Thresholds(3, 2));
+        $reporter = new TextReporter(new Thresholds(3, 2), new Paths('/nonexistent-root'));
 
         self::assertSame($expected, $reporter->render([$errorFinding, $warningFinding]));
     }
