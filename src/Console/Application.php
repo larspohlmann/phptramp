@@ -58,8 +58,7 @@ final class Application
         $args = array_slice($argv, 1);
 
         try {
-            $defaults = (new ConfigLoader())->load($this->workingDirectory());
-            $options = (new ArgvParser())->parse($args, $defaults);
+            $options = (new ArgvParser())->parse($args, $this->loadDefaults($args));
         } catch (ConfigException | InvalidArgsException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
@@ -83,6 +82,22 @@ final class Application
         }
 
         return $this->analyze($options);
+    }
+
+    /**
+     * Config seeds the parser's defaults, so it must be resolved before parsing
+     * — which means --no-config is detected from the raw args here, not from the
+     * parsed Options that do not exist yet.
+     *
+     * @param list<string> $args
+     */
+    private function loadDefaults(array $args): Options
+    {
+        if (in_array('--no-config', $args, true)) {
+            return new Options();
+        }
+
+        return (new ConfigLoader())->load($this->workingDirectory());
     }
 
     private function workingDirectory(): string

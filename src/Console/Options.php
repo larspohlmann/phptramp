@@ -32,6 +32,7 @@ final class Options
         public readonly ?string $baseline = null,
         public readonly ?string $generateBaseline = null,
         public readonly bool $dumpIndex = false,
+        public readonly bool $noConfig = false,
         public readonly bool $help = false,
         public readonly bool $version = false,
         public readonly array $exclude = [],

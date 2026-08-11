@@ -28,6 +28,7 @@ final class ArgvParser
         '--explain',
         '--changed-only',
         '--dump-index',
+        '--no-config',
         '--help',
         '-h',
         '--version',
@@ -48,6 +49,7 @@ final class ArgvParser
     private ?string $baseline = null;
     private ?string $generateBaseline = null;
     private bool $dumpIndex = false;
+    private bool $noConfig = false;
     private bool $help = false;
     private bool $version = false;
     private bool $clearedSeededPaths = false;
@@ -80,6 +82,7 @@ final class ArgvParser
             baseline: $this->baseline,
             generateBaseline: $this->generateBaseline,
             dumpIndex: $this->dumpIndex,
+            noConfig: $this->noConfig,
             help: $this->help,
             version: $this->version,
             exclude: $this->exclude,
@@ -98,6 +101,7 @@ final class ArgvParser
         $this->baseline = $defaults->baseline;
         $this->generateBaseline = $defaults->generateBaseline;
         $this->dumpIndex = $defaults->dumpIndex;
+        $this->noConfig = $defaults->noConfig;
         $this->help = $defaults->help;
         $this->version = $defaults->version;
         $this->exclude = $defaults->exclude;
@@ -160,6 +164,7 @@ final class ArgvParser
             '--explain' => $this->explain = true,
             '--changed-only' => $this->diffAware->changedOnly = true,
             '--dump-index' => $this->dumpIndex = true,
+            '--no-config' => $this->noConfig = true,
             '--help', '-h' => $this->help = true,
             '--version', '-V' => $this->version = true,
             default => throw new InvalidArgsException("unknown option: {$name}"),

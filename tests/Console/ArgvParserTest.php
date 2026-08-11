@@ -159,6 +159,16 @@ final class ArgvParserTest extends TestCase
         self::assertTrue($this->parse('--dump-index')->dumpIndex);
     }
 
+    public function testNoConfigFlagSetsNoConfig(): void
+    {
+        self::assertTrue($this->parse('--no-config')->noConfig);
+    }
+
+    public function testNoConfigDefaultsToFalse(): void
+    {
+        self::assertFalse($this->parse()->noConfig);
+    }
+
     public function testHelpFlags(): void
     {
         self::assertTrue($this->parse('--help')->help);

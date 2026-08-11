@@ -85,7 +85,7 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder]));
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--no-config']));
         self::assertStringContainsString('FINDING', self::contents($this->stdout));
     }
 
@@ -93,7 +93,7 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(0, $this->app->run(['phptramp', '--folder', $folder, '--limit', '4']));
+        self::assertSame(0, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--limit', '4']));
         self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
     }
 
@@ -101,7 +101,7 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'xml']));
+        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--format', 'xml']));
         self::assertStringContainsString('unknown format: xml', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
     }
@@ -110,7 +110,7 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--format', 'summary']));
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--format', 'summary']));
         self::assertStringContainsString('at or over the limit', self::contents($this->stdout));
     }
 
@@ -118,7 +118,7 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--format', 'json']));
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--format', 'json']));
 
         $output = self::contents($this->stdout);
         self::assertStringContainsString('"findings"', $output);
@@ -131,7 +131,7 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(
             0,
-            $this->app->run(['phptramp', '--folder', $folder, '--limit', '3', '--warn-limit', '2']),
+            $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '2']),
         );
         self::assertStringContainsString('WARNING', self::contents($this->stdout));
     }
@@ -147,7 +147,9 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithOneHopChain();
 
-        $exitCode = $this->app->run(['phptramp', '--folder', $folder, '--limit', '3', '--warn-limit', '5']);
+        $exitCode = $this->app->run(
+            ['phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '5'],
+        );
 
         self::assertSame(2, $exitCode);
         self::assertStringContainsString(
@@ -181,6 +183,33 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(1, $exitCode);
         self::assertStringContainsString('FINDING', self::contents($this->stdout));
+    }
+
+    public function testNoConfigIgnoresConfigFileInWorkingDirectory(): void
+    {
+        $directory = sys_get_temp_dir() . '/phptramp-cwd-' . uniqid();
+        mkdir($directory);
+        $this->folders[] = $directory;
+
+        file_put_contents($directory . '/phptramp.json', '{"limit": 1}');
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($directory . '/Demo.php', $code);
+
+        $previousCwd = getcwd();
+        self::assertIsString($previousCwd);
+
+        try {
+            chdir($directory);
+            $exitCode = $this->app->run(['phptramp', '--folder', $directory, '--no-config']);
+        } finally {
+            chdir($previousCwd);
+        }
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
     }
 
     public function testChangedOnlyWithDiffFileTouchingForwardingLineReportsFindingAndExitsOne(): void
