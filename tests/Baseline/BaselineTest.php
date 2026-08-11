@@ -170,7 +170,7 @@ final class BaselineTest extends TestCase
     public function testNonListFingerprintsThrowsBaselineException(): void
     {
         $this->expectException(BaselineException::class);
-        $this->expectExceptionMessage('fingerprints');
+        $this->expectExceptionMessage('"fingerprints" must be a list of strings, got string');
 
         Baseline::fromJson('{"fingerprints": "x"}');
     }
@@ -178,7 +178,7 @@ final class BaselineTest extends TestCase
     public function testNonStringEntryThrowsBaselineException(): void
     {
         $this->expectException(BaselineException::class);
-        $this->expectExceptionMessage('fingerprints');
+        $this->expectExceptionMessage('non-string entry at index 0: int');
 
         Baseline::fromJson('{"fingerprints": [1]}');
     }

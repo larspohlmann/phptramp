@@ -122,13 +122,18 @@ final class Baseline
     private static function stringEntries(mixed $fingerprints): array
     {
         if (! is_array($fingerprints) || ! array_is_list($fingerprints)) {
-            throw new BaselineException('"fingerprints" must be a list of strings');
+            throw new BaselineException(
+                '"fingerprints" must be a list of strings, got ' . get_debug_type($fingerprints),
+            );
         }
 
         $lines = [];
-        foreach ($fingerprints as $entry) {
+        foreach ($fingerprints as $index => $entry) {
             if (! is_string($entry)) {
-                throw new BaselineException('"fingerprints" must be a list of strings');
+                throw new BaselineException(
+                    '"fingerprints" must be a list of strings, non-string entry at index '
+                    . $index . ': ' . get_debug_type($entry),
+                );
             }
             $lines[] = $entry;
         }
