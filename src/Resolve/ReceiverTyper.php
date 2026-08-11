@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PhpTramp\Resolve;
 
 use PhpTramp\Index\MethodInfo;
-use PhpTramp\Index\ParamInfo;
 
 /**
  * Turns a method call's receiver hint into the FQCN the receiver is typed as, or
@@ -31,23 +30,12 @@ final class ReceiverTyper
             return null;
         }
 
-        $param = $this->matchingParam($hint, $caller);
+        $param = $caller->paramNamed($hint);
         if ($param !== null) {
             return $this->singleClassType($param->type);
         }
 
         return $hint;
-    }
-
-    private function matchingParam(string $hint, MethodInfo $caller): ?ParamInfo
-    {
-        foreach ($caller->params as $param) {
-            if ($param->name === $hint) {
-                return $param;
-            }
-        }
-
-        return null;
     }
 
     private function singleClassType(?string $type): ?string

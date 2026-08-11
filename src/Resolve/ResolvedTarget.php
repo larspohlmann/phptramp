@@ -15,4 +15,9 @@ final class ResolvedTarget implements Resolution
         public readonly string $boundParam,
     ) {
     }
+
+    public function describe(): string
+    {
+        return $this->fqmn;
+    }
 }

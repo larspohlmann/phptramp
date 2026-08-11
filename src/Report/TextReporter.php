@@ -49,7 +49,7 @@ final class TextReporter
             $lines[] = $this->hopLine($row, $labelWidth, $methodWidth);
         }
         foreach ($finding->notes as $note) {
-            $lines[] = self::INDENT . str_pad('note', $labelWidth) . self::COLUMN_GAP . $note;
+            $lines[] = $this->labelledLine('note', $labelWidth, $note);
         }
         foreach ($this->explainLines($finding) as $explainLine) {
             $lines[] = $explainLine;
@@ -86,7 +86,7 @@ final class TextReporter
         foreach ($finding->chain as $index => $hop) {
             $isTerminal = $hasTerminalNode && $index === $finding->hops;
             $rows[] = [
-                'label' => $this->label($index, $finding->hops, $isTerminal),
+                'label' => $this->label($index, $isTerminal),
                 'method' => $hop->fqmn . '($' . $finding->param . ')',
                 'location' => $this->location($hop),
                 'annotation' => $isTerminal ? '(' . $finding->terminalKind->value . ')' : '',
@@ -96,7 +96,7 @@ final class TextReporter
         return $rows;
     }
 
-    private function label(int $index, int $hops, bool $isTerminal): string
+    private function label(int $index, bool $isTerminal): string
     {
         if ($isTerminal) {
             return 'terminal';
@@ -118,14 +118,17 @@ final class TextReporter
      */
     private function hopLine(array $row, int $labelWidth, int $methodWidth): string
     {
-        $line = self::INDENT
-            . str_pad($row['label'], $labelWidth)
-            . self::COLUMN_GAP
-            . str_pad($row['method'], $methodWidth)
-            . self::COLUMN_GAP
-            . $row['location'];
+        $rest = str_pad($row['method'], $methodWidth) . self::COLUMN_GAP . $row['location'];
+        if ($row['annotation'] !== '') {
+            $rest .= self::COLUMN_GAP . $row['annotation'];
+        }
 
-        return $row['annotation'] === '' ? $line : $line . self::COLUMN_GAP . $row['annotation'];
+        return $this->labelledLine($row['label'], $labelWidth, $rest);
+    }
+
+    private function labelledLine(string $label, int $labelWidth, string $rest): string
+    {
+        return self::INDENT . str_pad($label, $labelWidth) . self::COLUMN_GAP . $rest;
     }
 
     /**

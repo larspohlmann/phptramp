@@ -15,4 +15,9 @@ final class TruncatedResolution implements Resolution
     public function __construct(public readonly string $reason)
     {
     }
+
+    public function describe(): string
+    {
+        return 'truncated: ' . $this->reason;
+    }
 }

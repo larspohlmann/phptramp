@@ -138,7 +138,7 @@ final class ChainTraversal
     private function followTarget(ResolvedTarget $target, PartialChain $chain): void
     {
         $method = $this->index->get($target->fqmn);
-        $param = $method === null ? null : $this->paramNamed($method, $target->boundParam);
+        $param = $method?->paramNamed($target->boundParam);
         if ($method === null || $param === null) {
             $this->record($chain, new Terminal(null, null, TerminalKind::External));
 
@@ -217,25 +217,7 @@ final class ChainTraversal
         $callee = $forward->callee;
         $edge = $callee->kind->value . ':' . $callee->name;
 
-        return $callerFqmn . ': ' . $edge . ' -> ' . $this->traceTarget($resolution);
-    }
-
-    private function traceTarget(Resolution $resolution): string
-    {
-        if ($resolution instanceof ResolvedTarget) {
-            return $resolution->fqmn;
-        }
-
-        if ($resolution instanceof ExternalTarget) {
-            return 'external: ' . $resolution->detail;
-        }
-
-        if ($resolution instanceof TruncatedResolution) {
-            return 'truncated: ' . $resolution->reason;
-        }
-
-        // Defensive: the three concrete Resolution types above are exhaustive today.
-        return 'unknown';
+        return $callerFqmn . ': ' . $edge . ' -> ' . $resolution->describe();
     }
 
     private function sortFindings(): void
@@ -244,17 +226,6 @@ final class ChainTraversal
             return [$left->chain[0]->file, $left->chain[0]->line, $left->param]
                 <=> [$right->chain[0]->file, $right->chain[0]->line, $right->param];
         });
-    }
-
-    private function paramNamed(MethodInfo $method, string $name): ?ParamInfo
-    {
-        foreach ($method->params as $param) {
-            if ($param->name === $name) {
-                return $param;
-            }
-        }
-
-        return null;
     }
 
     private function key(string $fqmn, string $param): string

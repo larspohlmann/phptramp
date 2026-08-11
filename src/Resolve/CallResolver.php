@@ -193,21 +193,10 @@ final class CallResolver
     private function boundParam(MethodInfo $target, int|string $argKey): ?ParamInfo
     {
         if (is_string($argKey)) {
-            return $this->paramByName($target, $argKey);
+            return $target->paramNamed($argKey);
         }
 
         return $this->paramByPosition($target, $argKey);
-    }
-
-    private function paramByName(MethodInfo $target, string $name): ?ParamInfo
-    {
-        foreach ($target->params as $param) {
-            if ($param->name === $name) {
-                return $param;
-            }
-        }
-
-        return null;
     }
 
     private function paramByPosition(MethodInfo $target, int $position): ?ParamInfo

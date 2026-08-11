@@ -15,4 +15,9 @@ final class ExternalTarget implements Resolution
     public function __construct(public readonly string $detail)
     {
     }
+
+    public function describe(): string
+    {
+        return 'external: ' . $this->detail;
+    }
 }
