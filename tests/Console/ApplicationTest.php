@@ -400,6 +400,117 @@ final class ApplicationTest extends TestCase
         self::assertFileExists($baselineFile);
     }
 
+    public function testBaselineConsumesRoundTripGeneratedFromSameTreeExitsZero(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $folder . '/baseline.json';
+
+        $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+        ]);
+
+        [$stdout, $stderr] = $this->freshStreams();
+        $consume = new Application($stdout, $stderr);
+
+        $exitCode = $consume->run([
+            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+        ]);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('No tramp data found', self::contents($stdout));
+    }
+
+    public function testBaselineConsumesKnownFindingButReportsNewChainExitsOne(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $folder . '/baseline.json';
+
+        $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+        ]);
+
+        file_put_contents($folder . '/NewDemo.php', $this->newThreeHopChainCode());
+
+        [$stdout, $stderr] = $this->freshStreams();
+        $consume = new Application($stdout, $stderr);
+
+        $exitCode = $consume->run([
+            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+        ]);
+
+        self::assertSame(1, $exitCode);
+        $output = self::contents($stdout);
+        self::assertStringContainsString('NewController', $output);
+        self::assertStringNotContainsString('Demo\Controller::handle', $output);
+    }
+
+    public function testBaselineConsumptionWithCorruptBaselineFileExitsTwo(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $baselineFile = $folder . '/baseline.json';
+        file_put_contents($baselineFile, '{"fingerprint": []}');
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+        ]);
+
+        self::assertSame(2, $exitCode);
+        self::assertStringContainsString('phptramp:', self::contents($this->stderr));
+        self::assertSame('', self::contents($this->stdout));
+    }
+
+    public function testBaselineConsumptionWithUnreadableBaselineFileExitsTwo(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+        $missingBaselineFile = $folder . '/does-not-exist.json';
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--baseline', $missingBaselineFile,
+        ]);
+
+        self::assertSame(2, $exitCode);
+        self::assertStringContainsString('phptramp:', self::contents($this->stderr));
+        self::assertSame('', self::contents($this->stdout));
+    }
+
+    public function testConfigFileBaselineKeyAppliesWithoutCliFlag(): void
+    {
+        $directory = sys_get_temp_dir() . '/phptramp-cwd-' . uniqid();
+        mkdir($directory);
+        $this->folders[] = $directory;
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { public function process(Cfg $config): void { (new ServiceB())->run($config); } } '
+            . 'class ServiceB { public function run(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($directory . '/Demo.php', $code);
+
+        [$genStdout, $genStderr] = $this->freshStreams();
+        $generate = new Application($genStdout, $genStderr);
+        $generate->run([
+            'phptramp', '--folder', $directory, '--no-config',
+            '--generate-baseline', $directory . '/baseline.json',
+        ]);
+
+        file_put_contents($directory . '/phptramp.json', '{"baseline": "baseline.json"}');
+
+        [$stdout, $stderr] = $this->freshStreams();
+        $consume = new Application($stdout, $stderr);
+        $previousCwd = getcwd();
+        self::assertIsString($previousCwd);
+
+        try {
+            chdir($directory);
+            $exitCode = $consume->run(['phptramp', '--folder', $directory]);
+        } finally {
+            chdir($previousCwd);
+        }
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('No tramp data found', self::contents($stdout));
+    }
+
     /**
      * @param list<string> $argv
      */
@@ -435,6 +546,30 @@ final class ApplicationTest extends TestCase
         rewind($stream);
 
         return $stream;
+    }
+
+    /** @return array{0: resource, 1: resource} */
+    private function freshStreams(): array
+    {
+        $stdout = fopen('php://memory', 'w+');
+        $stderr = fopen('php://memory', 'w+');
+        self::assertIsResource($stdout);
+        self::assertIsResource($stderr);
+
+        return [$stdout, $stderr];
+    }
+
+    private function newThreeHopChainCode(): string
+    {
+        return '<?php namespace Demo; class NewCfg {} '
+            . 'class NewController { public function handle(NewCfg $config): void '
+            . '{ (new NewServiceA())->process($config); } } '
+            . 'class NewServiceA { public function process(NewCfg $config): void '
+            . '{ (new NewServiceB())->run($config); } } '
+            . 'class NewServiceB { public function run(NewCfg $config): void '
+            . '{ new NewMailer($config); } } '
+            . 'class NewMailer { private NewCfg $c; '
+            . 'public function __construct(NewCfg $config) { $this->c = $config; } }';
     }
 
     private function writeDiffFile(string $folder, string $filename, string $contents): string

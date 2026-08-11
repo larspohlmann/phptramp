@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PhpTramp\Console;
 
 use PhpTramp\Baseline\Baseline;
+use PhpTramp\Baseline\BaselineException;
+use PhpTramp\Baseline\BaselineFilter;
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Config\ConfigException;
@@ -127,13 +129,15 @@ final class Application
     {
         try {
             $thresholds = new Thresholds($options->limit, $options->warnLimit);
+            $baselineFilter = new BaselineFilter();
+            $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
             $findings = $this->suppressedFindings(
                 $this->changedOnlyFindings($this->findChains($index), $options),
                 $index,
             );
-        } catch (InvalidArgsException | ParseException | DiffException $e) {
+        } catch (InvalidArgsException | ParseException | DiffException | BaselineException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
@@ -143,9 +147,25 @@ final class Application
             return $this->generateBaseline($findings, $thresholds, $options->generateBaseline, $options->baseline);
         }
 
+        $findings = $baselineFilter->exclude($findings, $baseline);
+
         fwrite($this->stdout, $reporter->render($findings));
 
         return $this->hasError($findings, $thresholds) ? 1 : 0;
+    }
+
+    /**
+     * Consume mode loads only when --baseline is set without --generate-baseline
+     * (generation wins when both are set and already notes the ignored flag).
+     * Fail fast before the expensive index build.
+     */
+    private function consumeBaseline(Options $options, BaselineFilter $baselineFilter): ?Baseline
+    {
+        if ($options->baseline === null || $options->generateBaseline !== null) {
+            return null;
+        }
+
+        return $baselineFilter->load($options->baseline);
     }
 
     /**
