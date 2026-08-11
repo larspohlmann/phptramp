@@ -19,7 +19,7 @@ final class ReporterFactory
 
         return match ($options->format) {
             'text' => new TextReporter($thresholds, new Paths($this->workingDirectory), $options->explain),
-            'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory)),
+            'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory), $options->changedOnly),
             'github' => new GithubReporter($thresholds, new Paths($this->workingDirectory)),
             'checkstyle' => new CheckstyleReporter($thresholds, new Paths($this->workingDirectory)),
             'sarif' => new SarifReporter($thresholds, new Paths($this->workingDirectory)),

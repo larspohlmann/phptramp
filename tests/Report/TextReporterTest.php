@@ -50,6 +50,42 @@ final class TextReporterTest extends TestCase
         self::assertSame($expected, $reporter->render([$finding]));
     }
 
+    public function testMarksChangedNonTerminalHopWithYoursAnnotation(): void
+    {
+        $chain = [
+            new Hop('Demo\Controller::handle', 'Demo\Controller', 'src/Demo.php', 12, 14),
+            new Hop('Demo\ServiceA::process', 'Demo\ServiceA', 'src/Demo.php', 18, 20, true),
+            new Hop('Demo\ServiceB::run', 'Demo\ServiceB', 'src/Demo.php', 24, 26),
+            new Hop('Demo\Mailer::__construct', 'Demo\Mailer', 'src/Demo.php', 32, null),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Controller::handle',
+            'Demo\Mailer::__construct',
+            TerminalKind::Stored,
+            3,
+            $chain,
+            4,
+            [],
+            [],
+        );
+
+        $expected = <<<'TXT'
+            FINDING  $config: 3 pass-through hops across 4 classes
+              origin    Demo\Controller::handle($config)   src/Demo.php:12
+              hop 2     Demo\ServiceA::process($config)    src/Demo.php:18  *YOURS*
+              hop 3     Demo\ServiceB::run($config)        src/Demo.php:24
+              terminal  Demo\Mailer::__construct($config)  src/Demo.php:32  (stored)
+
+            1 finding (limit: 3 hops).
+
+            TXT;
+
+        $reporter = new TextReporter(new Thresholds(3, null), new Paths('/nonexistent-root'));
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
     public function testRendersTruncatedChainWithNoteLineAndNoTerminal(): void
     {
         $chain = [

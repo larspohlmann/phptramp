@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpTramp\Report;
 
 use PhpTramp\Chain\Finding;
+use PhpTramp\Chain\Hop;
 
 /**
  * Renders findings as a single JSON document: `{limit, warnLimit, findings}`.
@@ -18,6 +19,7 @@ final class JsonReporter implements Reporter
     public function __construct(
         private readonly Thresholds $thresholds,
         private readonly Paths $paths,
+        private readonly bool $changedOnly = false,
     ) {
         $this->encoder = new JsonEncoder();
     }
@@ -82,16 +84,29 @@ final class JsonReporter implements Reporter
         $chain = [];
         foreach ($finding->chain as $index => $hop) {
             $isTerminal = $hasTerminalNode && $index === $finding->hops;
-            $chain[] = [
-                'method' => $hop->fqmn,
-                'role' => $this->role($index, $isTerminal),
-                'file' => $this->paths->relativize($hop->file),
-                'line' => $hop->line,
-                'forwardLine' => $hop->forwardLine,
-            ];
+            $chain[] = $this->hopDocument($hop, $index, $isTerminal);
         }
 
         return $chain;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function hopDocument(Hop $hop, int $index, bool $isTerminal): array
+    {
+        $document = [
+            'method' => $hop->fqmn,
+            'role' => $this->role($index, $isTerminal),
+            'file' => $this->paths->relativize($hop->file),
+            'line' => $hop->line,
+            'forwardLine' => $hop->forwardLine,
+        ];
+        if ($this->changedOnly) {
+            $document['changed'] = $hop->changed;
+        }
+
+        return $document;
     }
 
     private function role(int $index, bool $isTerminal): string

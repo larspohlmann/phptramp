@@ -55,6 +55,39 @@ final class GithubReporterTest extends TestCase
         self::assertSame($expected, $reporter->render([$finding]));
     }
 
+    public function testAnchorsAtFirstChangedNonTerminalHopWithSuffixAndOriginAsNotice(): void
+    {
+        $chain = [
+            new Hop('Demo\Controller::handle', 'Demo\Controller', 'src/Demo.php', 12, 14),
+            new Hop('Demo\ServiceA::process', 'Demo\ServiceA', 'src/Demo.php', 18, 20, true),
+            new Hop('Demo\ServiceB::run', 'Demo\ServiceB', 'src/Demo.php', 24, 26),
+            new Hop('Demo\Mailer::__construct', 'Demo\Mailer', 'src/Demo.php', 32, null),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Controller::handle',
+            'Demo\Mailer::__construct',
+            TerminalKind::Stored,
+            3,
+            $chain,
+            4,
+            [],
+            [],
+        );
+
+        $expected = "::error file=src/Demo.php,line=18,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
+            . "across 4 classes (terminal%3A Demo\\Mailer%3A%3A__construct [stored]) (hop 2 of the chain%2C "
+            . "changed by this diff)\n"
+            . "::notice file=src/Demo.php,line=12,title=phptramp%3A%3Ahop 1 of \$config chain from "
+            . "Demo\\Controller%3A%3Ahandle\n"
+            . "::notice file=src/Demo.php,line=24,title=phptramp%3A%3Ahop 3 of \$config chain from "
+            . "Demo\\Controller%3A%3Ahandle\n";
+
+        $reporter = new GithubReporter(new Thresholds(3, null), $this->paths());
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
     public function testEmitsWarningAnnotationAndOmitsNoticeWhenNoSubsequentHops(): void
     {
         $chain = [
