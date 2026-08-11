@@ -65,7 +65,7 @@ final class Application
             return 2;
         }
 
-        if ($args === [] || $options->help) {
+        if ($options->help) {
             fwrite($this->stdout, self::helpText());
 
             return 0;
@@ -81,7 +81,23 @@ final class Application
             return $this->dumpIndex($options);
         }
 
+        if ($this->nothingToAnalyze($options)) {
+            fwrite($this->stdout, self::helpText());
+
+            return 0;
+        }
+
         return $this->analyze($options);
+    }
+
+    /**
+     * A run with no folders and no files has nothing to work on. That happens
+     * for a bare `phptramp` with no config; when config supplies `paths` the
+     * folders are populated, so the same argument-less invocation analyzes.
+     */
+    private function nothingToAnalyze(Options $options): bool
+    {
+        return $options->folders === [] && $options->files === [];
     }
 
     /**

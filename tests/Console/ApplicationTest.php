@@ -77,8 +77,37 @@ final class ApplicationTest extends TestCase
 
     public function testNoArgumentsPrintsHelpAndExitsZero(): void
     {
-        self::assertSame(0, $this->app->run(['phptramp']));
+        self::assertSame(0, $this->app->run(['phptramp', '--no-config']));
         self::assertStringContainsString('Usage:', self::contents($this->stdout));
+    }
+
+    public function testNoArgumentsAnalyzeWhenConfigSuppliesPaths(): void
+    {
+        $directory = sys_get_temp_dir() . '/phptramp-cwd-' . uniqid();
+        mkdir($directory);
+        $this->folders[] = $directory;
+
+        file_put_contents($directory . '/phptramp.json', '{"paths": ["."], "limit": 1}');
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($directory . '/Demo.php', $code);
+
+        $previousCwd = getcwd();
+        self::assertIsString($previousCwd);
+
+        try {
+            chdir($directory);
+            $exitCode = $this->app->run(['phptramp']);
+        } finally {
+            chdir($previousCwd);
+        }
+
+        $output = self::contents($this->stdout);
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('FINDING', $output);
+        self::assertStringNotContainsString('Usage:', $output);
     }
 
     public function testDefaultRunReportsChainsAndExitsOne(): void
