@@ -124,6 +124,10 @@ which always runs with `--format json`.
 | `sarif` | `{"ruleId":"phptramp.trampData","level":"error","message":{"text":"$config: 3 pass-through hops across 4 classes (terminal: Demo\\Mailer::__construct [stored])"}}` |
 | `summary` | `12 chains total; 5 at or over the limit (limit: 3 hops).` |
 
+In a `--changed-only` run, each `json` chain entry additionally carries a `"changed":
+true|false` field marking whether that hop intersects the diff; a normal full run omits
+the field entirely rather than sending it as always-`false` noise.
+
 ## Suppression
 
 Mark a specific false positive as intentional instead of raising `--limit` project-wide:
