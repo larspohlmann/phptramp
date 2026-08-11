@@ -4,7 +4,9 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 0 (scaffold).** The analysis engine is not implemented yet.
+**Status: Phase 1.** The parameter usage classifier and whole-project index are
+implemented and inspectable via `phptramp --folder src --dump-index`; cross-file
+chain reporting (the default output) lands in Phase 2.
 See [docs/plan.md](docs/plan.md) for the full implementation plan and current phase.
 
 ## What it will do
