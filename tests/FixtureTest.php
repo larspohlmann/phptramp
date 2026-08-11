@@ -125,7 +125,10 @@ final class FixtureTest extends TestCase
      */
     private function runFolderMode(string $caseDir): array
     {
-        $argv = ['phptramp', '--folder', $caseDir . '/src', '--format', 'json', ...$this->extraCliArgs($caseDir)];
+        $argv = [
+            'phptramp', '--folder', $caseDir . '/src', '--no-config', '--format', 'json',
+            ...$this->extraCliArgs($caseDir),
+        ];
         [$exitCode, $decoded] = $this->runApplication($argv);
 
         return [$exitCode, $this->normalizeFindingsDocument($decoded, $caseDir)];
@@ -267,7 +270,9 @@ final class FixtureTest extends TestCase
         self::assertIsResource($stdout);
         self::assertIsResource($stderr);
 
-        $exit = (new Application($stdout, $stderr))->run(['phptramp', '--folder', $srcDir, '--dump-index']);
+        $exit = (new Application($stdout, $stderr))->run(
+            ['phptramp', '--folder', $srcDir, '--no-config', '--dump-index'],
+        );
         self::assertSame(0, $exit);
 
         rewind($stdout);

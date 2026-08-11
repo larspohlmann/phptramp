@@ -4,11 +4,12 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 3.** Cross-file chain reporting works: `phptramp --folder src`
+**Status: Phase 4.** Cross-file chain reporting works: `phptramp --folder src`
 stitches forwarding chains across files and prints findings in any of six formats,
 exiting `0`/`1`/`2`. A `phptramp.json` config file, `#[TrampIgnore]`/
 `// phptramp-ignore` suppression, and a `--warn-limit` warning tier are all wired
-up. The classifier and whole-project index remain inspectable via `--dump-index`.
+up. Diff-aware mode (`--changed-only`/`--git-base`/`--diff`) is shipped too — see
+below. The classifier and whole-project index remain inspectable via `--dump-index`.
 See [docs/plan.md](docs/plan.md) for the full implementation plan and current phase.
 
 ## What it does
@@ -33,8 +34,28 @@ the "tramp data" smell: every method in the middle is coupled to a value it has 
 business knowing about. The fix is usually a parameter object, a context object, or
 dependency injection at the terminal — this tool tells you *where*.
 
-The flagship feature (Phase 4) is diff-aware CI mode: run it on a pull request and it
-reports **"your edit made this chain longer"**, marking exactly which hops are yours.
+The flagship feature is diff-aware CI mode: run it on a pull request and it reports
+**"your edit made this chain longer"**, marking exactly which hops are yours.
+`--changed-only` restricts findings to chains that intersect a diff — a hop matches iff
+its declaration line or its forwarding call-site line was touched — and each matching
+hop's location line grows a `*YOURS*` annotation:
+
+```text
+$ vendor/bin/phptramp --folder src --changed-only --git-base origin/main
+
+FINDING  $config: 3 pass-through hops across 4 classes
+  origin    App\Http\Controller::handle($config)    src/Http/Controller.php:21
+  hop 2     App\Service\ServiceA::process($config)  src/Service/ServiceA.php:14  *YOURS*
+  hop 3     App\Service\ServiceB::run($config)      src/Service/ServiceB.php:9
+  terminal  App\Mail\Mailer::__construct($config)   src/Mail/Mailer.php:12  (stored)
+
+1 finding (limit: 3 hops).
+```
+
+`--git-base <ref>` (default `origin/main`) supplies the diff via
+`git diff --unified=0 <ref>...HEAD` (three-dot, merge-base semantics); `--diff <path|->`
+reads a unified diff from a file, or from stdin with `-`, instead — either always implies
+`--changed-only`. See [docs/ci.md](docs/ci.md) for GitHub Actions and GitLab recipes.
 
 ## Installation
 
@@ -59,9 +80,13 @@ composer tramp
 composer tramp -- --format json --warn-limit 2
 ```
 
-phptramp itself does not ship a `composer.json` script of this name — `vendor/bin/phptramp`
-(or `bin/phptramp` inside this repo) is the invocation; the snippet above is a convenience
-you add to a *consuming* project.
+This repository gates itself with exactly such a script: `composer tramp` runs
+`bin/phptramp` against the paths and thresholds in its own `phptramp.dist.json`
+(`paths: src`, `limit: 3`, `warn-limit: 2`), and CI fails the build on any finding at or
+over the limit. That is the same `composer tramp` invocation a consuming project gets from
+the snippet above — here the paths come from config, so no `--folder` is needed; a consumer
+can configure `paths` the same way or pass `--folder src` inline. (`--no-config` bypasses
+the config file entirely when you want to drive everything from flags.)
 
 ## CLI
 
@@ -75,8 +100,9 @@ phptramp [options]
   --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
   --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
   --explain                 Show why chains ended (call resolution trace)
-  --changed-only            Reserved for diff-aware mode (Phase 4) — accepted, not yet wired up
-  --git-base <ref>          Reserved for diff-aware mode (Phase 4) — accepted, not yet wired up
+  --changed-only            Only report chains touching changed lines
+  --git-base <ref>          Diff base for --changed-only (default: origin/main)
+  --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
   --baseline <file>         Reserved for baselining (Phase 5) — accepted, not yet wired up
   --generate-baseline <f>   Reserved for baselining (Phase 5) — accepted, not yet wired up
 ```
@@ -123,6 +149,10 @@ which always runs with `--format json`.
 | `checkstyle` | `<error line="12" severity="error" message="$config: 3 pass-through hops across 4 classes (terminal: Demo\Mailer::__construct [stored])" source="phptramp.trampData"/>` |
 | `sarif` | `{"ruleId":"phptramp.trampData","level":"error","message":{"text":"$config: 3 pass-through hops across 4 classes (terminal: Demo\\Mailer::__construct [stored])"}}` |
 | `summary` | `12 chains total; 5 at or over the limit (limit: 3 hops).` |
+
+In a `--changed-only` run, each `json` chain entry additionally carries a `"changed":
+true|false` field marking whether that hop intersects the diff; a normal full run omits
+the field entirely rather than sending it as always-`false` noise.
 
 ## Suppression
 

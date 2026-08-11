@@ -51,6 +51,7 @@
             "@md",
             "@test"
         ],
+        "tramp": "@php bin/phptramp",
         "infection": "infection --threads=max",
         "infection:diff": "infection --git-diff-filter=AM --git-diff-base=origin/main --threads=max --ignore-msi-with-no-mutations"
     },

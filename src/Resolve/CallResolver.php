@@ -39,7 +39,7 @@ final class CallResolver
 
     private function resolveFunction(ForwardSite $site, MethodInfo $caller): Resolution
     {
-        $target = $this->functionTarget($site->callee->name, $caller);
+        $target = $this->functionTarget($site->callee->name, $this->namespaceOf($caller));
         if ($target === null) {
             return new ExternalTarget('function not in index');
         }
@@ -47,9 +47,9 @@ final class CallResolver
         return $this->bind($target, $site);
     }
 
-    private function functionTarget(string $name, MethodInfo $caller): ?MethodInfo
+    private function functionTarget(string $name, string $callerNamespace): ?MethodInfo
     {
-        foreach ($this->functionCandidates($name, $caller) as $candidate) {
+        foreach ($this->functionCandidates($name, $callerNamespace) as $candidate) {
             $target = $this->index->get($candidate);
             if ($target !== null) {
                 return $target;
@@ -65,18 +65,17 @@ final class CallResolver
      *
      * @return list<string>
      */
-    private function functionCandidates(string $name, MethodInfo $caller): array
+    private function functionCandidates(string $name, string $callerNamespace): array
     {
         if (str_contains($name, '\\')) {
             return [$name];
         }
 
-        $namespace = $this->namespaceOf($caller);
-        if ($namespace === '') {
+        if ($callerNamespace === '') {
             return [$name];
         }
 
-        return [$namespace . '\\' . $name, $name];
+        return [$callerNamespace . '\\' . $name, $name];
     }
 
     private function namespaceOf(MethodInfo $caller): string

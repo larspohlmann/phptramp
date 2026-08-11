@@ -18,6 +18,17 @@ final class Hop
         public readonly int $line,
         /** Line of the forwarding call site; null on the terminal node. */
         public readonly ?int $forwardLine,
+        /** Whether this hop intersects the diff in diff-aware mode. */
+        public readonly bool $changed = false,
     ) {
+    }
+
+    /**
+     * A copy of this hop with its diff-aware `changed` mark set — so the
+     * diff filter never has to know this constructor's full signature.
+     */
+    public function withChanged(bool $changed): self
+    {
+        return new self($this->fqmn, $this->class, $this->file, $this->line, $this->forwardLine, $changed);
     }
 }

@@ -6,6 +6,7 @@ namespace PhpTramp\Report;
 
 use PhpTramp\Chain\Finding;
 use PhpTramp\Chain\Hop;
+use PhpTramp\Chain\TerminalKind;
 
 /**
  * Renders findings as aligned plain text. Columns are two-space separated; the
@@ -114,11 +115,23 @@ final class TextReporter implements Reporter
                 'label' => $this->label($index, $isTerminal),
                 'method' => $hop->fqmn . '($' . $finding->param . ')',
                 'location' => $this->location($hop),
-                'annotation' => $isTerminal ? '(' . $finding->terminalKind->value . ')' : '',
+                'annotation' => $this->annotation($hop, $finding->terminalKind, $isTerminal),
             ];
         }
 
         return $rows;
+    }
+
+    private function annotation(Hop $hop, TerminalKind $terminalKind, bool $isTerminal): string
+    {
+        if ($isTerminal) {
+            return '(' . $terminalKind->value . ')';
+        }
+        if ($hop->changed) {
+            return '*YOURS*';
+        }
+
+        return '';
     }
 
     private function label(int $index, bool $isTerminal): string

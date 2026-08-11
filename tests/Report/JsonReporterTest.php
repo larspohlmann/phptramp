@@ -99,6 +99,97 @@ final class JsonReporterTest extends TestCase
         self::assertSame($expected, $reporter->render([$finding]));
     }
 
+    public function testChangedOnlyRunAppendsChangedKeyAsLastEntryInEachChainEntry(): void
+    {
+        $chain = [
+            new Hop('Demo\Controller::handle', 'Demo\Controller', 'src/Demo.php', 12, 14),
+            new Hop('Demo\ServiceA::process', 'Demo\ServiceA', 'src/Demo.php', 18, 20, true),
+            new Hop('Demo\ServiceB::run', 'Demo\ServiceB', 'src/Demo.php', 24, 26),
+            new Hop('Demo\Mailer::__construct', 'Demo\Mailer', 'src/Demo.php', 32, null),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Controller::handle',
+            'Demo\Mailer::__construct',
+            TerminalKind::Stored,
+            3,
+            $chain,
+            4,
+            [],
+            [],
+        );
+
+        $expected = <<<'JSON'
+            {
+                "limit": 3,
+                "warnLimit": 2,
+                "findings": [
+                    {
+                        "param": "config",
+                        "severity": "error",
+                        "origin": "Demo\\Controller::handle",
+                        "terminal": "Demo\\Mailer::__construct",
+                        "terminalKind": "stored",
+                        "hops": 3,
+                        "classes": 4,
+                        "chain": [
+                            {
+                                "method": "Demo\\Controller::handle",
+                                "role": "origin",
+                                "file": "src/Demo.php",
+                                "line": 12,
+                                "forwardLine": 14,
+                                "changed": false
+                            },
+                            {
+                                "method": "Demo\\ServiceA::process",
+                                "role": "hop",
+                                "file": "src/Demo.php",
+                                "line": 18,
+                                "forwardLine": 20,
+                                "changed": true
+                            },
+                            {
+                                "method": "Demo\\ServiceB::run",
+                                "role": "hop",
+                                "file": "src/Demo.php",
+                                "line": 24,
+                                "forwardLine": 26,
+                                "changed": false
+                            },
+                            {
+                                "method": "Demo\\Mailer::__construct",
+                                "role": "terminal",
+                                "file": "src/Demo.php",
+                                "line": 32,
+                                "forwardLine": null,
+                                "changed": false
+                            }
+                        ],
+                        "notes": []
+                    }
+                ]
+            }
+
+            JSON;
+
+        $reporter = new JsonReporter(new Thresholds(3, 2), $this->paths(), true);
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
+    public function testChangedOnlyFlagDefaultsToFalseAndOmitsChangedKey(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7, true),
+        ];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\A::go', TerminalKind::Used, 1, $chain, 1, [], []);
+
+        $reporter = new JsonReporter(new Thresholds(1, null), $this->paths());
+
+        self::assertStringNotContainsString('"changed"', $reporter->render([$finding]));
+    }
+
     public function testRendersWarningSeverityAndOmitsBelowThresholdFinding(): void
     {
         $warningChain = [
