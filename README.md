@@ -111,8 +111,9 @@ key, or a value of the wrong type, is a config error rather than a silently igno
 
 ## Output formats
 
-`--format` selects the renderer; all six are implemented and covered by an exact-string
-test plus a fixture.
+`--format` selects the renderer; all six are implemented and each has an exact-string
+unit test. `json` is additionally exercised end-to-end by the `tests/fixtures/` harness,
+which always runs with `--format json`.
 
 | Format | One-line example |
 |---|---|
