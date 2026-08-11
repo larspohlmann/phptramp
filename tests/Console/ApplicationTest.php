@@ -97,13 +97,21 @@ final class ApplicationTest extends TestCase
         self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
     }
 
-    public function testUnsupportedFormatExitsWithToolErrorCode(): void
+    public function testUnknownFormatExitsWithToolErrorCode(): void
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'summary']));
-        self::assertStringContainsString('not implemented', self::contents($this->stderr));
+        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'xml']));
+        self::assertStringContainsString('unknown format: xml', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
+    }
+
+    public function testSummaryFormatReportsAllChainsAndExitsOne(): void
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--format', 'summary']));
+        self::assertStringContainsString('at or over the limit', self::contents($this->stdout));
     }
 
     public function testJsonFormatReportsFindingsAndExitsOne(): void

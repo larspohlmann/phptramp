@@ -20,7 +20,8 @@ final class FindingMessage
             . ' (terminal: ' . $this->terminalClause($finding) . ')';
     }
 
-    private function terminalClause(Finding $finding): string
+    /** Shared with {@see SummaryReporter}'s "Top 10 longest chains" column. */
+    public function terminalClause(Finding $finding): string
     {
         if ($finding->terminal === null) {
             return $finding->terminalKind->value;

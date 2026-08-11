@@ -7,6 +7,7 @@ namespace PhpTramp\Tests\Report;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Chain\Hop;
 use PhpTramp\Chain\TerminalKind;
+use PhpTramp\Console\InvalidArgsException;
 use PhpTramp\Console\Options;
 use PhpTramp\Report\ReporterFactory;
 use PHPUnit\Framework\TestCase;
@@ -57,5 +58,28 @@ final class ReporterFactoryTest extends TestCase
         $reporter = $factory->create(new Options(format: 'sarif', limit: 2));
 
         self::assertStringContainsString('"phptramp.trampData"', $reporter->render($this->qualifyingFinding()));
+    }
+
+    public function testSummaryFormatRoutesToSummaryReporter(): void
+    {
+        $factory = new ReporterFactory('/not/matching');
+        $reporter = $factory->create(new Options(format: 'summary', limit: 2));
+
+        self::assertStringContainsString('at or over the limit', $reporter->render($this->qualifyingFinding()));
+    }
+
+    /**
+     * ArgvParser::validateFormat already rejects any format outside the six
+     * valid values before Options ever reaches the factory, so this exercises
+     * the `default` arm directly — the only way to reach it at all.
+     */
+    public function testUnroutableFormatThrows(): void
+    {
+        $factory = new ReporterFactory('/not/matching');
+
+        $this->expectException(InvalidArgsException::class);
+        $this->expectExceptionMessage("format 'xml' is not implemented yet.");
+
+        $factory->create(new Options(format: 'xml'));
     }
 }
