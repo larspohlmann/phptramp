@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace PhpTramp\Console;
 
+use PhpTramp\Discovery\FileLocator;
+use PhpTramp\Index\ForwardSite;
+use PhpTramp\Index\Indexer;
+use PhpTramp\Index\MethodIndex;
+use PhpTramp\Index\ParamInfo;
+use PhpTramp\Index\ParseException;
+
 final class Application
 {
     public const NAME = 'phptramp';
@@ -32,21 +39,80 @@ final class Application
     {
         $args = array_slice($argv, 1);
 
-        if ($args === [] || in_array('--help', $args, true) || in_array('-h', $args, true)) {
+        try {
+            $options = (new ArgvParser())->parse($args);
+        } catch (InvalidArgsException $e) {
+            fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
+
+            return 2;
+        }
+
+        if ($args === [] || $options->help) {
             fwrite($this->stdout, self::helpText());
 
             return 0;
         }
 
-        if (in_array('--version', $args, true) || in_array('-V', $args, true)) {
+        if ($options->version) {
             fwrite($this->stdout, self::NAME . ' ' . self::VERSION . "\n");
 
             return 0;
         }
 
-        fwrite($this->stderr, "phptramp: analysis is not implemented yet (Phase 0 scaffold). See docs/plan.md.\n");
+        if ($options->dumpIndex) {
+            return $this->dumpIndex($options);
+        }
+
+        fwrite($this->stderr, "phptramp: chain analysis is not implemented yet (Phase 1). See docs/plan.md.\n");
 
         return 2;
+    }
+
+    private function dumpIndex(Options $options): int
+    {
+        try {
+            $files = (new FileLocator())->locate($options);
+            $index = (new Indexer())->index($files);
+        } catch (InvalidArgsException | ParseException $e) {
+            fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
+
+            return 2;
+        }
+
+        fwrite($this->stdout, $this->renderIndex($index));
+
+        return 0;
+    }
+
+    private function renderIndex(MethodIndex $index): string
+    {
+        $methods = [];
+        foreach ($index->all() as $fqmn => $method) {
+            if ($method->params === []) {
+                continue;
+            }
+
+            $methods[$fqmn] = [
+                'file' => $method->file,
+                'params' => array_map(
+                    fn (ParamInfo $param): array => [
+                        'name' => $param->name,
+                        'fate' => $param->fate->name,
+                        'forwards' => array_map($this->renderForward(...), $param->forwards),
+                    ],
+                    $method->params,
+                ),
+            ];
+        }
+
+        $json = json_encode(['methods' => $methods], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        return ($json === false ? '{"methods":{}}' : $json) . "\n";
+    }
+
+    private function renderForward(ForwardSite $forward): string
+    {
+        return $forward->callee->kind->value . ':' . $forward->callee->name . '@' . $forward->argKey;
     }
 
     private static function helpText(): string
@@ -69,7 +135,7 @@ final class Application
             Reporting:
               --limit <n>               Fail on chains with >= n pass-through hops (default: 3)
               --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
-              --format <fmt>            text|json|github|checkstyle|sarif (default: text)
+              --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
               --explain                 Show why chains ended (call resolution trace)
 
             Diff-aware mode:
@@ -80,6 +146,9 @@ final class Application
               --baseline <file>         Ignore findings recorded in the baseline file
               --generate-baseline <file>  Write current findings to a baseline file
 
+            Debugging:
+              --dump-index              Print the classified method index as JSON and exit
+
             Misc:
               -h, --help                Show this help
               -V, --version             Show version
@@ -89,7 +158,8 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 0 scaffold - analysis is not implemented yet. See docs/plan.md.
+            Status: Phase 1 - classifier and --dump-index shipped; chain analysis
+            (default reporting) lands in Phase 2. See docs/plan.md.
 
             TXT;
     }
