@@ -103,6 +103,12 @@ final class FileIndexCacheTest extends TestCase
         file_put_contents($file, self::SAMPLE . "\n// appended\n");
         touch($file, $originalMtime);
 
+        // Restoring mtime to the second the file already carries is a no-op
+        // touch, which on some platforms (PHP 8.2) does not flush PHP's stat
+        // cache — so the stat here would report the pre-write size. Flush it so
+        // get() sees the grown file, exactly as a fresh process would.
+        clearstatcache();
+
         self::assertNull(
             $cache->get($file),
             'size mismatch alone (mtime restored to cached value) must invalidate the entry',
