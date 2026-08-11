@@ -742,7 +742,14 @@ measured on the actual tree).
 
 ---
 
-## Phase 5 — Baseline
+## Phase 5 — Baseline  (in progress — issue #9)
+
+**Detailed step-by-step plan: [docs/plans/phase-5.md](plans/phase-5.md)** — written
+against the shipped Phase 1–4 interfaces; where it refines the sketches below
+(fingerprint terminal token = terminal FQMN or the TerminalKind value rather than
+a per-reason category; suppression refactored into a fired-tracking filter so
+stale ignores are detectable; stale detection skipped under `--changed-only`),
+the detailed plan wins.
 
 - **5.1 Fingerprint:** frozen rule 10, exact bytes:
   `sha1(origin . "\0" . param . "\0" . terminal)`. Truncated chains use
