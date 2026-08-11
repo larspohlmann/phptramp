@@ -228,6 +228,48 @@ final class UsageClassifierTest extends TestCase
         self::assertSame(ParamFate::Unused, $this->classify('log(1);')['p']->fate);
     }
 
+    public function testPropertyStoreOnlyIsStoredOnly(): void
+    {
+        $p = $this->classify('$this->x = $p;')['p'];
+        self::assertSame(ParamFate::Used, $p->fate);
+        self::assertTrue($p->storedOnly);
+    }
+
+    public function testStorePlusReadIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('$this->x = $p; log($p->env);')['p']->storedOnly);
+    }
+
+    public function testPureForwardIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('other($p);')['p']->storedOnly);
+    }
+
+    public function testPlainForwardingUseIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('log($p);')['p']->storedOnly);
+    }
+
+    public function testUntouchedParamIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('log(1);')['p']->storedOnly);
+    }
+
+    public function testPromotedConstructorPropertyIsStoredOnly(): void
+    {
+        $code = '<?php class Cfg {} class Mailer { '
+            . 'public function __construct(private Cfg $p) {} }';
+        $file = tempnam(sys_get_temp_dir(), 'phptramp') . '.php';
+        file_put_contents($file, $code);
+        try {
+            $method = (new Indexer())->index([$file])->get('Mailer::__construct');
+            self::assertNotNull($method);
+            self::assertTrue($method->params[0]->storedOnly);
+        } finally {
+            unlink($file);
+        }
+    }
+
     public function testConstructorPropertyStorageIsUsed(): void
     {
         $code = '<?php class Cfg {} class Mailer { private Cfg $c; '
