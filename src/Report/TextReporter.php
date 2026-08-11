@@ -18,8 +18,10 @@ final class TextReporter
     private const COLUMN_GAP = '  ';
     private const MIN_LABEL_WIDTH = 8;
 
-    public function __construct(private readonly int $limit)
-    {
+    public function __construct(
+        private readonly int $limit,
+        private readonly bool $explain = false,
+    ) {
     }
 
     /**
@@ -49,8 +51,28 @@ final class TextReporter
         foreach ($finding->notes as $note) {
             $lines[] = self::INDENT . str_pad('note', $labelWidth) . self::COLUMN_GAP . $note;
         }
+        foreach ($this->explainLines($finding) as $explainLine) {
+            $lines[] = $explainLine;
+        }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function explainLines(Finding $finding): array
+    {
+        if (! $this->explain || $finding->trace === []) {
+            return [];
+        }
+
+        $lines = [self::INDENT . 'explain:'];
+        foreach ($finding->trace as $traceLine) {
+            $lines[] = self::INDENT . self::INDENT . $traceLine;
+        }
+
+        return $lines;
     }
 
     /**

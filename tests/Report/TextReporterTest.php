@@ -97,6 +97,41 @@ final class TextReporterTest extends TestCase
         self::assertSame($expected, (new TextReporter(1))->render([$finding]));
     }
 
+    public function testExplainAppendsTraceLinesUnderHeader(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\B::step', 'Demo\B', 'src/B.php', 9, null),
+        ];
+        $trace = ['Demo\A::go: method:step -> Demo\B::step'];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\B::step', TerminalKind::Used, 1, $chain, 2, [], $trace);
+
+        $expected = <<<'TXT'
+            FINDING  $p: 1 pass-through hop across 2 classes
+              origin    Demo\A::go($p)    src/A.php:5
+              terminal  Demo\B::step($p)  src/B.php:9  (used)
+              explain:
+                Demo\A::go: method:step -> Demo\B::step
+
+            1 finding (limit: 3 hops).
+
+            TXT;
+
+        self::assertSame($expected, (new TextReporter(3, true))->render([$finding]));
+    }
+
+    public function testExplainDisabledOmitsTraceEvenWhenPresent(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\B::step', 'Demo\B', 'src/B.php', 9, null),
+        ];
+        $trace = ['Demo\A::go: method:step -> Demo\B::step'];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\B::step', TerminalKind::Used, 1, $chain, 2, [], $trace);
+
+        self::assertStringNotContainsString('explain:', (new TextReporter(3))->render([$finding]));
+    }
+
     public function testEmptyFindingsRendersReassuringLine(): void
     {
         self::assertSame(

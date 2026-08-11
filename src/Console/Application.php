@@ -88,7 +88,7 @@ final class Application
         }
 
         $findings = $this->findChains($index, $options->limit);
-        fwrite($this->stdout, (new TextReporter($options->limit))->render($findings));
+        fwrite($this->stdout, (new TextReporter($options->limit, $options->explain))->render($findings));
 
         return $findings === [] ? 0 : 1;
     }
