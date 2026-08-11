@@ -392,6 +392,7 @@ final class Application
             Baseline:
               --baseline <file>         Ignore findings recorded in the baseline file
               --generate-baseline <file>  Write current findings to a baseline file
+              --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
 
             Debugging:
               --dump-index              Print the classified method index as JSON and exit
@@ -405,12 +406,16 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 4 - diff-aware mode is shipped: --changed-only /
-            --git-base / --diff report only chains touching the diff and mark
-            which hops are yours, across all six formats
-            (text/json/github/checkstyle/sarif/summary). phptramp.json config,
-            #[TrampIgnore]/phptramp-ignore suppression, and --warn-limit are
-            wired up. See docs/plan.md.
+            Status: Phase 5 - baseline is shipped: --generate-baseline /
+            --baseline ignore refactor-stable findings recorded in the file,
+            and --fail-on-stale exits 1 when a baseline entry or suppression
+            matches nothing (full runs only — stale detection is skipped
+            under --changed-only). Phase 4 - diff-aware mode
+            (--changed-only / --git-base / --diff) reports only chains
+            touching the diff and marks which hops are yours, across all six
+            formats (text/json/github/checkstyle/sarif/summary).
+            phptramp.json config, #[TrampIgnore]/phptramp-ignore suppression,
+            and --warn-limit are wired up. See docs/plan.md.
 
             TXT;
     }

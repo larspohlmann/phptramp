@@ -97,9 +97,91 @@ exclusive and commonly run side by side.
 
 ## Baseline for legacy adoption
 
-Turning phptramp on for an existing codebase full of pre-existing tramp data
-means the full-scan gate above fails immediately. `--baseline`/
-`--generate-baseline` — snapshot current findings once, then only fail on
-*new* ones — is the answer, and ships in Phase 5. Until then, `--changed-only`
-is the practical way to adopt phptramp on a legacy codebase: it never sees
-pre-existing chains that a PR doesn't touch.
+Turning phptramp on for an existing codebase full of pre-existing tramp data means
+the full-scan gate above fails immediately. Baselining fixes that: snapshot the
+current findings once, commit the file, and from then on CI only fails on *new*
+chains. The fingerprint is refactor-stable (origin + param + terminal token — never
+line numbers or intermediate hops), so a baseline survives renames and chain
+shortening without churning. See the README's [Baseline](../README.md#baseline)
+section for the adoption story; the recipes below are the CI half.
+
+### Generate the baseline once
+
+Run locally, commit the file:
+
+```bash
+vendor/bin/phptramp --folder src --generate-baseline phptramp-baseline.json
+git add phptramp-baseline.json
+git commit -m "chore: snapshot phptramp baseline"
+```
+
+### Full-scan gate with baseline (the legacy-adoption job)
+
+A full scan that no longer fails on pre-existing findings — the baseline hides
+them, only *new* chains above `--limit` exit `1`. Pair with `--fail-on-stale` if
+the repo wants strict stale hygiene (exit `1` when a baseline entry matches
+nothing, so fixed chains get pruned from the file).
+
+```yaml
+name: phptramp (full scan)
+
+on:
+  push:
+    branches: [main]
+  pull_request: ~
+
+jobs:
+  phptramp-full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - run: composer update --no-interaction --no-progress
+      - name: phptramp (baseline-gated full scan)
+        run: >-
+          vendor/bin/phptramp --folder src
+          --baseline phptramp-baseline.json
+          --fail-on-stale
+          --format github
+```
+
+### Diff-aware PR job composing `--changed-only --baseline`
+
+The strict repo's other half: on a PR, gate on *new* chains touching the diff
+(`--changed-only`) while the baseline keeps the pre-existing ones quiet. Stale
+detection is skipped under `--changed-only` (the diff filter removes most chains
+before matching, so "stale" would be almost everything — full runs only), so
+`--fail-on-stale` is intentionally not passed here — it would be a no-op.
+
+```yaml
+name: phptramp (PR)
+
+on:
+  pull_request: ~
+
+jobs:
+  phptramp-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - run: composer update --no-interaction --no-progress
+      - name: Fetch the base branch
+        run: git fetch --no-tags origin "${GITHUB_BASE_REF}"
+      - name: phptramp (changed lines only, baseline-gated)
+        run: >-
+          vendor/bin/phptramp --folder src
+          --changed-only --git-base "origin/${GITHUB_BASE_REF}"
+          --baseline phptramp-baseline.json
+          --format github
+```
+
+Run the full-scan job on `push` (or a nightly schedule) to surface stale baseline
+entries and prune them; run the diff-aware job on PRs to gate edits. The two are
+not mutually exclusive — commonly they run side by side.
