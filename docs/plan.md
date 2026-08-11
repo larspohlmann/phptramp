@@ -30,7 +30,11 @@ filters, not analysis shortcuts (chains cross files).
 - Config file `phptramp.json` / `phptramp.dist.json`; precedence CLI > config > defaults.
 - Fixture-first TDD: every semantic rule in this document exists as a fixture under
   `tests/fixtures/<case>/` before the code that satisfies it.
-- PHPStan level max on `src/` and `bin/` must stay green in every commit.
+- Full QA toolchain green in every commit: PHPStan level max (`src/`, `bin/`), PHPCS
+  PSR-12 (`src/`, `tests/` minus fixtures), PHPMD codesize (`src/`), PHPUnit. PRs
+  additionally pass diff-scoped Infection mutation testing (minMsi 80) — for a tool
+  whose product is semantic correctness, escaped mutants in classifier/resolver code
+  are exactly the bugs users would hit. `composer check` runs cs+stan+md+test locally.
 - **Non-goal:** auto-fix. Never plan or implement it.
 
 ---
@@ -380,6 +384,6 @@ intersecting the diff and marks which hops are the user's.
 ## Self-review checklist (run at every phase end)
 
 1. Every frozen-semantics bullet touched this phase has a fixture.
-2. `composer test` + `composer stan` green on 8.2/8.3/8.4 matrix.
+2. `composer check` (cs + stan + md + test) green, tests green on 8.2/8.3/8.4 matrix.
 3. Help text (`Application::helpText`), README, and this plan agree with actual flags.
 4. No placeholder output ("TODO", "not implemented") reachable from shipped flags.

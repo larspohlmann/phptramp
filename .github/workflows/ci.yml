@@ -22,8 +22,8 @@ jobs:
       - run: composer update --no-interaction --no-progress
       - run: vendor/bin/phpunit
 
-  phpstan:
-    name: PHPStan (level max)
+  static:
+    name: Static analysis (PHPCS, PHPStan, PHPMD)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,4 +32,49 @@ jobs:
           php-version: '8.4'
           coverage: none
       - run: composer update --no-interaction --no-progress
-      - run: vendor/bin/phpstan analyse --no-progress
+      - name: PHPCS (PSR-12)
+        run: composer cs
+      - name: PHPStan (level max)
+        run: composer stan
+      - name: PHPMD (codesize)
+        run: composer md
+
+  # Line coverage says a line ran; it does not say a test would notice if the
+  # line were wrong. Infection changes the line and reports whether anything
+  # failed — for an analyzer whose product is semantic correctness, that is
+  # the property the suite is actually meant to have. Scoped to the files the
+  # branch changes so the job stays fast and the bar applies to touched code.
+  mutation:
+    name: Mutation (changed files)
+    runs-on: ubuntu-latest
+    # Needs a base to diff against, which only a pull request has.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Infection diffs the branch against the PR base, so the shallow
+          # default clone is not enough — the base ref has to be present.
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          # The one job that needs a coverage driver: Infection maps each
+          # mutant to the tests that reach it. PCOV over Xdebug because it is
+          # several times faster and this job runs the suite many times over.
+          coverage: pcov
+      - run: composer update --no-interaction --no-progress
+      - name: Fetch the base branch
+        run: git fetch --no-tags origin '${{ github.event.pull_request.base.ref }}'
+      # Escaped mutants come back as PR annotations on the offending line.
+      # --ignore-msi-with-no-mutations because a diff can legitimately produce
+      # no mutants at all (a comment-only edit); without it Infection compares
+      # the threshold against an MSI of 0% and fails an innocent PR.
+      - name: Infection
+        run: >-
+          vendor/bin/infection
+          --git-diff-filter=AM
+          --git-diff-base='origin/${{ github.event.pull_request.base.ref }}'
+          --threads=max
+          --logger-github
+          --no-progress
+          --ignore-msi-with-no-mutations

@@ -1,0 +1,23 @@
+{
+    $schema: 'vendor/infection/infection/resources/schema.json',
+    source: {
+        directories: ['src'],
+    },
+    logs: {
+        text: 'infection.log',
+    },
+    mutators: {
+        '@default': true,
+    },
+    phpUnit: {
+        configDir: '.',
+    },
+    // A mutant that loops forever has to be cut off, and the cut-off has to sit
+    // far enough above a healthy test run that a slow CI runner cannot trip it.
+    timeout: 30,
+    // The CI gate runs against changed files only (composer infection:diff), so
+    // this is the bar for code a branch touches. For an analyzer whose whole
+    // value is semantic correctness, escaped mutants in classifier/resolver
+    // code are exactly the bugs users would hit — keep this high.
+    minMsi: 80,
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<ruleset name="phptramp">
+    <description>PSR-12 for phptramp.</description>
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="p"/>
+    <rule ref="PSR12"/>
+    <file>src</file>
+    <file>tests</file>
+    <!-- Analyzer fixtures are input data, not code under our style rules: they
+         deliberately contain multiple classes per file, odd formatting, and
+         whatever else a semantic test case needs. -->
+    <exclude-pattern>tests/fixtures/*</exclude-pattern>
+</ruleset>

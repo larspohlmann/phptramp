@@ -20,8 +20,11 @@
         "nikic/php-parser": "^5.0"
     },
     "require-dev": {
+        "infection/infection": "^0.34",
+        "phpmd/phpmd": "^2.15",
         "phpstan/phpstan": "^2.0",
-        "phpunit/phpunit": "^11.5 || ^12.0"
+        "phpunit/phpunit": "^11.5 || ^12.0",
+        "squizlabs/php_codesniffer": "^3.13"
     },
     "autoload": {
         "psr-4": {
@@ -38,9 +41,23 @@
     ],
     "scripts": {
         "test": "phpunit",
-        "stan": "phpstan analyse --no-progress"
+        "stan": "phpstan analyse --no-progress",
+        "cs": "phpcs",
+        "cs:fix": "phpcbf",
+        "md": "phpmd src text phpmd.xml.dist",
+        "check": [
+            "@cs",
+            "@stan",
+            "@md",
+            "@test"
+        ],
+        "infection": "infection --threads=max",
+        "infection:diff": "infection --git-diff-filter=AM --git-diff-base=origin/main --threads=max --ignore-msi-with-no-mutations"
     },
     "config": {
+        "allow-plugins": {
+            "infection/extension-installer": true
+        },
         "sort-packages": true
     }
 }

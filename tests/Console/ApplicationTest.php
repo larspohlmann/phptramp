@@ -53,7 +53,11 @@ final class ApplicationTest extends TestCase
         self::assertSame(0, $this->app->run(['phptramp', '--help']));
 
         $help = self::contents($this->stdout);
-        foreach (['--folder', '--file', '--files', '--limit', '--format', '--changed-only', '--baseline', 'Exit codes'] as $expected) {
+        $documented = [
+            '--folder', '--file', '--files', '--limit',
+            '--format', '--changed-only', '--baseline', 'Exit codes',
+        ];
+        foreach ($documented as $expected) {
             self::assertStringContainsString($expected, $help);
         }
     }
