@@ -1,13 +1,20 @@
 {
+    "limit": 1,
+    "warnLimit": null,
     "findings": [
         {
             "param": "config",
+            "severity": "error",
             "origin": "Demo\\entry",
             "terminal": "Demo\\Sink::__construct",
             "terminalKind": "stored",
             "hops": 2,
-            "chain": ["Demo\\entry", "Demo\\Middle::relay", "Demo\\Sink::__construct"],
             "classes": 2,
+            "chain": [
+                {"method": "Demo\\entry", "role": "origin", "file": "src/Demo.php", "line": 9, "forwardLine": 11},
+                {"method": "Demo\\Middle::relay", "role": "hop", "file": "src/Demo.php", "line": 16, "forwardLine": 18},
+                {"method": "Demo\\Sink::__construct", "role": "terminal", "file": "src/Demo.php", "line": 26, "forwardLine": null}
+            ],
             "notes": []
         }
     ]

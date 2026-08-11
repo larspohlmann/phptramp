@@ -1,13 +1,18 @@
 {
+    "limit": 1,
+    "warnLimit": null,
     "findings": [
         {
             "param": "config",
+            "severity": "error",
             "origin": "Demo\\Controller::run",
             "terminal": null,
             "terminalKind": "truncated",
             "hops": 1,
-            "chain": ["Demo\\Controller::run"],
             "classes": 1,
+            "chain": [
+                {"method": "Demo\\Controller::run", "role": "origin", "file": "src/Demo.php", "line": 32, "forwardLine": 34}
+            ],
             "notes": ["truncated: 2 implementations"]
         }
     ]

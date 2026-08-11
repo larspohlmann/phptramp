@@ -1,13 +1,18 @@
 {
+    "limit": 1,
+    "warnLimit": null,
     "findings": [
         {
             "param": "config",
+            "severity": "error",
             "origin": "Demo\\Looper::go",
             "terminal": null,
             "terminalKind": "truncated",
             "hops": 1,
-            "chain": ["Demo\\Looper::go"],
             "classes": 1,
+            "chain": [
+                {"method": "Demo\\Looper::go", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13}
+            ],
             "notes": ["(recursive)"]
         }
     ]
