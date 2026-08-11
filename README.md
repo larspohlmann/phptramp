@@ -118,7 +118,7 @@ test plus a fixture.
 |---|---|
 | `text` | `FINDING  $config: 3 pass-through hops across 4 classes` |
 | `json` | `{"limit":3,"warnLimit":null,"findings":[{"param":"config","severity":"error","hops":3,...}]}` |
-| `github` | `::error file=src/Demo.php,line=12,title=phptramp::$config: 3 pass-through hops across 4 classes (terminal: Demo\Mailer::__construct [stored])` |
+| `github` | `::error file=src/Demo.php,line=12,title=phptramp%3A%3A$config%3A 3 pass-through hops across 4 classes (terminal%3A Demo\Mailer%3A%3A__construct [stored])` |
 | `checkstyle` | `<error line="12" severity="error" message="$config: 3 pass-through hops across 4 classes (terminal: Demo\Mailer::__construct [stored])" source="phptramp.trampData"/>` |
 | `sarif` | `{"ruleId":"phptramp.trampData","level":"error","message":{"text":"$config: 3 pass-through hops across 4 classes (terminal: Demo\\Mailer::__construct [stored])"}}` |
 | `summary` | `12 chains total; 5 at or over the limit (limit: 3 hops).` |

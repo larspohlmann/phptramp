@@ -12,7 +12,8 @@ use PhpTramp\Chain\Hop;
  * `::warning` annotation at the origin per finding, plus one `::notice` per
  * subsequent hop (the terminal node, when present, is not annotated). See
  * https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions
- * for the message-data escaping this reporter applies.
+ * for the property-value escaping this reporter applies to every `file=` and
+ * `title=` value.
  */
 final class GithubReporter implements Reporter
 {
@@ -67,18 +68,18 @@ final class GithubReporter implements Reporter
         $title = 'phptramp::' . $this->message->describe($finding);
 
         return '::' . $severity->label()
-            . ' file=' . $this->escape($this->paths->relativize($origin->file))
+            . ' file=' . $this->escapeProperty($this->paths->relativize($origin->file))
             . ',line=' . $origin->line
-            . ',title=' . $this->escape($title);
+            . ',title=' . $this->escapeProperty($title);
     }
 
     private function hopNotice(Finding $finding, Hop $hop, int $index): string
     {
         $title = 'phptramp::hop ' . ($index + 1) . ' of $' . $finding->param . ' chain from ' . $finding->origin;
 
-        return '::notice file=' . $this->escape($this->paths->relativize($hop->file))
+        return '::notice file=' . $this->escapeProperty($this->paths->relativize($hop->file))
             . ',line=' . $hop->line
-            . ',title=' . $this->escape($title);
+            . ',title=' . $this->escapeProperty($title);
     }
 
     /**
@@ -96,9 +97,19 @@ final class GithubReporter implements Reporter
         return $hops;
     }
 
-    private function escape(string $value): string
+    /**
+     * Escapes a workflow-command PROPERTY value (a `file=`/`title=` component),
+     * per `@actions/core`'s `escapeProperty`: the same %/\r/\n data-escaping as
+     * a command's message body, plus `:` and `,` — the two characters that
+     * would otherwise be misread as property separators. `%` must be escaped
+     * first, or the `%3A`/`%2C`/`%0D`/`%0A` sequences introduced below would
+     * themselves get re-escaped.
+     */
+    private function escapeProperty(string $value): string
     {
         $value = str_replace('%', '%25', $value);
+        $value = str_replace(':', '%3A', $value);
+        $value = str_replace(',', '%2C', $value);
         $value = str_replace("\r", '%0D', $value);
 
         return str_replace("\n", '%0A', $value);
