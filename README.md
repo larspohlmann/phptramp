@@ -4,22 +4,27 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 1.** The parameter usage classifier and whole-project index are
-implemented and inspectable via `phptramp --folder src --dump-index`; cross-file
-chain reporting (the default output) lands in Phase 2.
+**Status: Phase 2.** Cross-file chain reporting works: `phptramp --folder src`
+stitches forwarding chains across files and prints text findings, exiting `0`/`1`/`2`.
+The classifier and whole-project index remain inspectable via `--dump-index`; other
+output formats (`json`, `github`, …) land in Phase 3.
 See [docs/plan.md](docs/plan.md) for the full implementation plan and current phase.
 
-## What it will do
+## What it does
 
 ```text
 $ vendor/bin/phptramp --folder src --limit 3
 
 FINDING  $config: 3 pass-through hops across 4 classes
-  origin    App\Http\Controller::handle($config)        src/Http/Controller.php:21
-  hop 1     App\Service\ServiceA::process($config)      src/Service/ServiceA.php:14
-  hop 2     App\Service\ServiceB::run($config)          src/Service/ServiceB.php:9
-  terminal  App\Mail\Mailer::__construct($config)       src/Mail/Mailer.php:12   (stored)
+  origin    App\Http\Controller::handle($config)     src/Http/Controller.php:21
+  hop 2     App\Service\ServiceA::process($config)   src/Service/ServiceA.php:14
+  hop 3     App\Service\ServiceB::run($config)       src/Service/ServiceB.php:9
+  terminal  App\Mail\Mailer::__construct($config)    src/Mail/Mailer.php:12  (stored)
 ```
+
+The origin is hop 1, so a 3-hop chain runs origin → hop 2 → hop 3 → terminal; the
+summary counts the origin. Add `--explain` to see, per edge, how each call was
+resolved.
 
 A **hop** is a method that receives a parameter and *purely forwards* it — never reads a
 property, never calls a method on it, never uses it in an expression. Long hop chains are

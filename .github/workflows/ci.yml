@@ -38,6 +38,11 @@ jobs:
         run: composer stan
       - name: PHPMD (codesize)
         run: composer md
+      # Dogfood: run phptramp on its own source. Report-only for now (--limit 99
+      # can never fail) so the chain output is visible in CI logs; Phase 6 lowers
+      # it to a real gate once the codebase is deliberately chain-clean.
+      - name: Dogfood (report-only)
+        run: bin/phptramp --folder src --limit 99
 
   # Line coverage says a line ran; it does not say a test would notice if the
   # line were wrong. Infection changes the line and reports whether anything
