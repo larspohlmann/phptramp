@@ -255,6 +255,26 @@ final class UsageClassifierTest extends TestCase
         self::assertFalse($this->classify('log(1);')['p']->storedOnly);
     }
 
+    public function testStoreThatAlsoForwardsIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('$this->x = $p; other($p);')['p']->storedOnly);
+    }
+
+    public function testClosureCaptureIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('$f = function () use ($p) { other($p); };')['p']->storedOnly);
+    }
+
+    public function testArrowFnReferenceIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('$f = fn () => other($p);')['p']->storedOnly);
+    }
+
+    public function testByRefParamIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('other($p);', 'Cfg &$p')['p']->storedOnly);
+    }
+
     public function testPromotedConstructorPropertyIsStoredOnly(): void
     {
         $code = '<?php class Cfg {} class Mailer { '

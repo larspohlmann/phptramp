@@ -94,6 +94,41 @@ final class CallResolverTest extends TestCase
         self::assertSame('Demo\Base::make', $resolution->fqmn);
     }
 
+    public function testStaticCallViaStaticKeyword(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Base { public static function make(Cfg $x): void {} } '
+            . 'class Child extends Base { public function go(Cfg $p): void { static::make($p); } }';
+
+        $resolution = $this->resolve($code, 'Demo\Child::go');
+        self::assertInstanceOf(ResolvedTarget::class, $resolution);
+        self::assertSame('Demo\Base::make', $resolution->fqmn);
+    }
+
+    public function testStaticCallViaParentKeyword(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Base { public static function make(Cfg $x): void {} } '
+            . 'class Child extends Base { public function go(Cfg $p): void { parent::make($p); } }';
+
+        $resolution = $this->resolve($code, 'Demo\Child::go');
+        self::assertInstanceOf(ResolvedTarget::class, $resolution);
+        self::assertSame('Demo\Base::make', $resolution->fqmn);
+    }
+
+    public function testFunctionCallerResolvesNamespacedFunction(): void
+    {
+        // The caller is itself a namespaced function; its namespace must come from
+        // its own FQMN, not a declaring class (it has none).
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'function outer(Cfg $p): void { inner($p); } '
+            . 'function inner(Cfg $x): void {}';
+
+        $resolution = $this->resolve($code, 'Demo\outer');
+        self::assertInstanceOf(ResolvedTarget::class, $resolution);
+        self::assertSame('Demo\inner', $resolution->fqmn);
+    }
+
     public function testMethodOnThis(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
@@ -161,13 +196,23 @@ final class CallResolverTest extends TestCase
         self::assertInstanceOf(ExternalTarget::class, $this->resolve($code, 'Demo\Caller::go'));
     }
 
-    public function testUnionTypedReceiverTruncates(): void
+    public function testUnionTypedReceiverTruncatesAsUnresolvableType(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
             . 'class A { public function handle(Cfg $x): void {} } class B {} '
             . 'class Caller { public function go(A|B $u, Cfg $p): void { $u->handle($p); } }';
 
-        self::assertInstanceOf(TruncatedResolution::class, $this->resolve($code, 'Demo\Caller::go'));
+        $resolution = $this->resolve($code, 'Demo\Caller::go');
+        self::assertInstanceOf(TruncatedResolution::class, $resolution);
+        self::assertSame('unresolvable type', $resolution->reason);
+    }
+
+    public function testStaticCallOnClassNotInIndexIsExternal(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Caller { public function go(Cfg $p): void { \Vendor\Thing::run($p); } }';
+
+        self::assertInstanceOf(ExternalTarget::class, $this->resolve($code, 'Demo\Caller::go'));
     }
 
     public function testRawReceiverTruncatesAsUntyped(): void

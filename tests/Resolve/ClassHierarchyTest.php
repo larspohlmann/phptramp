@@ -163,6 +163,16 @@ final class ClassHierarchyTest extends TestCase
         self::assertSame([], $this->hierarchy(self::KINDS)->implementationsOf('Demo\Nonexistent'));
     }
 
+    public function testCyclicInheritanceTerminatesWithoutHanging(): void
+    {
+        // Malformed input: A extends B extends A. The visited set must stop both
+        // the method walk and the supertype walk from looping forever.
+        $hierarchy = $this->hierarchy('<?php namespace Demo; class Node extends Ring {} class Ring extends Node {}');
+
+        self::assertNull($hierarchy->methodOn('Demo\Node', 'ghost'));
+        self::assertContains('Demo\Node', $hierarchy->implementationsOf('Demo\Node'));
+    }
+
     public function testIsAbstractTypeForEveryKind(): void
     {
         $hierarchy = $this->hierarchy(self::KINDS);
