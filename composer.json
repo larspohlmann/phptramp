@@ -20,7 +20,7 @@
         "nikic/php-parser": "^5.0"
     },
     "require-dev": {
-        "infection/infection": "^0.34",
+        "infection/infection": "^0.29.14 || ^0.34",
         "phpmd/phpmd": "^2.15",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^11.5 || ^12.0",
