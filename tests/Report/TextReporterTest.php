@@ -199,7 +199,10 @@ final class TextReporterTest extends TestCase
 
         $reporter = new TextReporter(new Thresholds(1, null), new Paths('/tmp/project'));
 
-        self::assertStringContainsString('src/Demo.php:5', $reporter->render([$finding]));
+        $output = $reporter->render([$finding]);
+
+        self::assertStringContainsString('src/Demo.php:5', $output);
+        self::assertStringNotContainsString('/tmp/project', $output);
     }
 
     public function testRendersMixedErrorAndWarningFindingsWithCombinedSummary(): void
