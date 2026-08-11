@@ -607,11 +607,16 @@ class Mailer
 
 ---
 
-## Phase 2 — Chain stitching → *usable tool*
+## Phase 2 — Chain stitching → *usable tool*  (in progress — issue #3)
 
 **Deliverable:** `phptramp --folder src --limit 3` prints text findings, exits 0/1/2.
 
-Tasks (expand to steps in `docs/plans/phase-2.md` before starting):
+**Detailed step-by-step plan: [docs/plans/phase-2.md](plans/phase-2.md)** — written
+against the actual Phase 1 interfaces; where it refines the task sketches below
+(e.g. `ClassKind`, `storedOnly`, `Resolution` as an interface with three
+implementations), the detailed plan wins.
+
+Tasks (expanded in `docs/plans/phase-2.md`):
 
 - **2.1 ClassHierarchy:** flatten traits into classes; map interface/abstract →
   concrete implementations across the whole index; expose
