@@ -4,11 +4,12 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: Phase 3.** Cross-file chain reporting works: `phptramp --folder src`
+**Status: Phase 4.** Cross-file chain reporting works: `phptramp --folder src`
 stitches forwarding chains across files and prints findings in any of six formats,
 exiting `0`/`1`/`2`. A `phptramp.json` config file, `#[TrampIgnore]`/
 `// phptramp-ignore` suppression, and a `--warn-limit` warning tier are all wired
-up. The classifier and whole-project index remain inspectable via `--dump-index`.
+up. Diff-aware mode (`--changed-only`/`--git-base`/`--diff`) is shipped too — see
+below. The classifier and whole-project index remain inspectable via `--dump-index`.
 See [docs/plan.md](docs/plan.md) for the full implementation plan and current phase.
 
 ## What it does
@@ -33,8 +34,28 @@ the "tramp data" smell: every method in the middle is coupled to a value it has 
 business knowing about. The fix is usually a parameter object, a context object, or
 dependency injection at the terminal — this tool tells you *where*.
 
-The flagship feature (Phase 4) is diff-aware CI mode: run it on a pull request and it
-reports **"your edit made this chain longer"**, marking exactly which hops are yours.
+The flagship feature is diff-aware CI mode: run it on a pull request and it reports
+**"your edit made this chain longer"**, marking exactly which hops are yours.
+`--changed-only` restricts findings to chains that intersect a diff — a hop matches iff
+its declaration line or its forwarding call-site line was touched — and each matching
+hop's location line grows a `*YOURS*` annotation:
+
+```text
+$ vendor/bin/phptramp --folder src --changed-only --git-base origin/main
+
+FINDING  $config: 3 pass-through hops across 4 classes
+  origin    App\Http\Controller::handle($config)    src/Http/Controller.php:21
+  hop 2     App\Service\ServiceA::process($config)  src/Service/ServiceA.php:14  *YOURS*
+  hop 3     App\Service\ServiceB::run($config)      src/Service/ServiceB.php:9
+  terminal  App\Mail\Mailer::__construct($config)   src/Mail/Mailer.php:12  (stored)
+
+1 finding (limit: 3 hops).
+```
+
+`--git-base <ref>` (default `origin/main`) supplies the diff via
+`git diff --unified=0 <ref>...HEAD` (three-dot, merge-base semantics); `--diff <path|->`
+reads a unified diff from a file, or from stdin with `-`, instead — either always implies
+`--changed-only`. See [docs/ci.md](docs/ci.md) for GitHub Actions and GitLab recipes.
 
 ## Installation
 
@@ -79,8 +100,9 @@ phptramp [options]
   --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
   --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
   --explain                 Show why chains ended (call resolution trace)
-  --changed-only            Reserved for diff-aware mode (Phase 4) — accepted, not yet wired up
-  --git-base <ref>          Reserved for diff-aware mode (Phase 4) — accepted, not yet wired up
+  --changed-only            Only report chains touching changed lines
+  --git-base <ref>          Diff base for --changed-only (default: origin/main)
+  --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
   --baseline <file>         Reserved for baselining (Phase 5) — accepted, not yet wired up
   --generate-baseline <f>   Reserved for baselining (Phase 5) — accepted, not yet wired up
 ```

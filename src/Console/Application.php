@@ -310,10 +310,12 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 3 - cross-file chain reporting works across all six
-            formats (text/json/github/checkstyle/sarif/summary). phptramp.json
-            config, #[TrampIgnore]/phptramp-ignore suppression, and --warn-limit
-            are wired up. See docs/plan.md.
+            Status: Phase 4 - diff-aware mode is shipped: --changed-only /
+            --git-base / --diff report only chains touching the diff and mark
+            which hops are yours, across all six formats
+            (text/json/github/checkstyle/sarif/summary). phptramp.json config,
+            #[TrampIgnore]/phptramp-ignore suppression, and --warn-limit are
+            wired up. See docs/plan.md.
 
             TXT;
     }
