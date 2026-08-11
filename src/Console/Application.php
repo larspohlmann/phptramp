@@ -12,7 +12,9 @@ use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
-use PhpTramp\Report\TextReporter;
+use PhpTramp\Report\ReporterFactory;
+use PhpTramp\Report\Severity;
+use PhpTramp\Report\Thresholds;
 use PhpTramp\Resolve\CallResolver;
 use PhpTramp\Resolve\ClassHierarchy;
 
@@ -73,24 +75,35 @@ final class Application
 
     private function analyze(Options $options): int
     {
-        if ($options->format !== 'text') {
-            fwrite($this->stderr, "phptramp: format '{$options->format}' is not implemented until Phase 3.\n");
-
-            return 2;
-        }
-
         try {
             $index = $this->buildIndex($options);
+            $reporter = (new ReporterFactory())->create($options);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
         }
 
-        $findings = $this->findChains($index, $options->limit);
-        fwrite($this->stdout, (new TextReporter($options->limit, $options->explain))->render($findings));
+        $findings = $this->findChains($index);
+        fwrite($this->stdout, $reporter->render($findings));
 
-        return $findings === [] ? 0 : 1;
+        $thresholds = new Thresholds($options->limit, $options->warnLimit);
+
+        return $this->hasError($findings, $thresholds) ? 1 : 0;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     */
+    private function hasError(array $findings, Thresholds $thresholds): bool
+    {
+        foreach ($findings as $finding) {
+            if ($thresholds->severityOf($finding) === Severity::Error) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function buildIndex(Options $options): MethodIndex
@@ -103,12 +116,11 @@ final class Application
     /**
      * @return list<Finding>
      */
-    private function findChains(MethodIndex $index, int $limit): array
+    private function findChains(MethodIndex $index): array
     {
         $resolver = new CallResolver($index, new ClassHierarchy($index));
-        $findings = (new ChainBuilder($resolver))->build($index);
 
-        return array_values(array_filter($findings, static fn (Finding $finding): bool => $finding->hops >= $limit));
+        return (new ChainBuilder($resolver))->build($index);
     }
 
     private function dumpIndex(Options $options): int

@@ -106,6 +106,32 @@ final class ApplicationTest extends TestCase
         self::assertSame('', self::contents($this->stdout));
     }
 
+    public function testWarnOnlyRunExitsZeroButPrintsWarning(): void
+    {
+        $folder = $this->fixtureWithTwoHopChain();
+
+        self::assertSame(
+            0,
+            $this->app->run(['phptramp', '--folder', $folder, '--limit', '3', '--warn-limit', '2']),
+        );
+        self::assertStringContainsString('WARNING', self::contents($this->stdout));
+    }
+
+    private function fixtureWithTwoHopChain(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Controller { public function handle(Cfg $config): void { (new ServiceA())->process($config); } } '
+            . 'class ServiceA { public function process(Cfg $config): void { new Mailer($config); } } '
+            . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
+    }
+
     private function fixtureWithThreeHopChain(): string
     {
         $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
