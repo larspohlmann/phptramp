@@ -59,9 +59,13 @@ composer tramp
 composer tramp -- --format json --warn-limit 2
 ```
 
-phptramp itself does not ship a `composer.json` script of this name — `vendor/bin/phptramp`
-(or `bin/phptramp` inside this repo) is the invocation; the snippet above is a convenience
-you add to a *consuming* project.
+This repository gates itself with exactly such a script: `composer tramp` runs
+`bin/phptramp` against the paths and thresholds in its own `phptramp.dist.json`
+(`paths: src`, `limit: 3`, `warn-limit: 2`), and CI fails the build on any finding at or
+over the limit. That is the same `composer tramp` invocation a consuming project gets from
+the snippet above — here the paths come from config, so no `--folder` is needed; a consumer
+can configure `paths` the same way or pass `--folder src` inline. (`--no-config` bypasses
+the config file entirely when you want to drive everything from flags.)
 
 ## CLI
 
