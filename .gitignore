@@ -3,3 +3,4 @@
 /.phpunit.cache/
 /.idea/
 /infection.log
+/.superpowers/
