@@ -22,6 +22,7 @@ final class ReporterFactory
             'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory)),
             'github' => new GithubReporter($thresholds, new Paths($this->workingDirectory)),
             'checkstyle' => new CheckstyleReporter($thresholds, new Paths($this->workingDirectory)),
+            'sarif' => new SarifReporter($thresholds, new Paths($this->workingDirectory)),
             default => throw new InvalidArgsException("format '{$options->format}' is not implemented yet."),
         };
     }

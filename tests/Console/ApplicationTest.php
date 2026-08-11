@@ -101,7 +101,7 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'sarif']));
+        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--format', 'summary']));
         self::assertStringContainsString('not implemented', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
     }
