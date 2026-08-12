@@ -186,11 +186,12 @@ enables.
 unit test. `json` is additionally exercised end-to-end by the `tests/fixtures/` harness,
 which always runs with `--format json`.
 
-`pretty` is the default when STDOUT is a TTY; non-TTY invocations (pipes, CI
-redirection) fall back to `text` automatically. Use `--color=never` to suppress
-color on a TTY, `--color=always` to force it in a pipe, or set the `NO_COLOR`
-environment variable. `NO_COLOR` is honored only in `auto` (the default); `always`
-and `never` are absolute.
+`pretty` is the default when STDOUT is a TTY. In `--color=auto` (the default),
+non-TTY invocations (pipes, CI redirection) fall back to `text` automatically.
+`--color=never` keeps plain `pretty` in a pipe; `--color=always` keeps colored
+`pretty` (the escape hatch for piping into `less -R`). Use `--color=never` to
+suppress color on a TTY, or set the `NO_COLOR` environment variable. `NO_COLOR`
+is honored only in `auto`; `always` and `never` are absolute.
 
 | Format | One-line example |
 |---|---|

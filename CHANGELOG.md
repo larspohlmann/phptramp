@@ -18,13 +18,17 @@ the git log and the merged pull requests.
 - `colorMode` config key in `phptramp.json` / `phptramp.dist.json`.
 
 ### Changed
-- Default `--format` is now `pretty` (TTY-gated). Non-TTY invocations
-  (pipes, CI redirection) automatically use `text`. Pass `--format text`
+- Default `--format` is now `pretty` (TTY-gated). In `--color=auto` (the
+  default), non-TTY invocations (pipes, CI redirection) automatically use
+  `text`. `--color=never` keeps plain `pretty` in a pipe; `--color=always`
+  keeps colored `pretty` (escape hatch for `less -R`). Pass `--format text`
   explicitly to force the old default on a TTY.
 
 ### Migration
 - If you snapshot `--format text` output against a baseline, no change is
-  needed — pipes get `text` automatically.
+  needed — pipes get `text` automatically (the default `--color=auto`
+  downgrades non-TTY `pretty` to `text`).
 - If you run `phptramp` interactively and pipe the default output, you now
-  get `text` (no ANSI) in the pipe. To force color into a pipe, pass
-  `--color=always`.
+  get `text` (no ANSI) in the pipe. To force colored `pretty` into a pipe,
+  pass `--color=always`. To force plain `pretty` (file-grouped layout
+  without ANSI), pass `--color=never`.

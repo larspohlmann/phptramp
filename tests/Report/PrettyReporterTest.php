@@ -7,6 +7,7 @@ namespace PhpTramp\Tests\Report;
 use PhpTramp\Chain\Finding;
 use PhpTramp\Chain\Hop;
 use PhpTramp\Chain\TerminalKind;
+use PhpTramp\Report\AnsiStyler;
 use PhpTramp\Report\NullStyler;
 use PhpTramp\Report\Paths;
 use PhpTramp\Report\PrettyReporter;
@@ -406,5 +407,170 @@ TXT;
         );
 
         self::assertSame($expected, $reporter->render([$error, $warning]));
+    }
+
+    /**
+     * Within-file sort uses the FIRST hop's line, not any later hop's. Two
+     * findings in the same file where finding A starts earlier (line 5) but
+     * its terminal sits later (line 20) than finding B's terminal (line 15).
+     * Correct sort by chain[0]->line puts A before B; sorting by chain[1]
+     * would flip them. Input is deliberately reversed so a no-op sort would
+     * also fail the assertion.
+     */
+    public function testWithinFileSortUsesFirstHopLineNotLaterHops(): void
+    {
+        $earlyStartLateTerminal = new Finding(
+            'a',
+            'Demo\A::go',
+            'Demo\B::sink',
+            TerminalKind::Used,
+            1,
+            [
+                new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, null),
+                new Hop('Demo\B::sink', 'Demo\B', 'src/A.php', 20, null),
+            ],
+            2,
+            [],
+            [],
+        );
+        $lateStartEarlyTerminal = new Finding(
+            'b',
+            'Demo\C::run',
+            'Demo\D::end',
+            TerminalKind::Used,
+            1,
+            [
+                new Hop('Demo\C::run', 'Demo\C', 'src/A.php', 10, null),
+                new Hop('Demo\D::end', 'Demo\D', 'src/A.php', 15, null),
+            ],
+            2,
+            [],
+            [],
+        );
+
+        $expected = <<<'TXT'
+src/A.php
+
+FINDING  $a: 1 pass-through hop across 2 classes
+  origin    Demo\A::go($a)    src/A.php:5
+  terminal  Demo\B::sink($a)  src/A.php:20  (used)
+
+FINDING  $b: 1 pass-through hop across 2 classes
+  origin    Demo\C::run($b)  src/A.php:10
+  terminal  Demo\D::end($b)  src/A.php:15  (used)
+
+----------------------------------------------------------------
+
+2 findings (limit: 1 hop).
+
+TXT;
+
+        $reporter = new PrettyReporter(
+            new Thresholds(1, null),
+            new Paths('/nonexistent-root'),
+            false,
+            new NullStyler(),
+        );
+
+        self::assertSame($expected, $reporter->render([$lateStartEarlyTerminal, $earlyStartLateTerminal]));
+    }
+
+    /**
+     * explain:false suppresses the trace block even when the finding carries
+     * a non-empty trace. Guards the `! $this->explain || trace === []` guard
+     * against an `&&` mutation that would render the block whenever a trace
+     * exists, regardless of the explain flag.
+     */
+    public function testExplainBlockSuppressedWhenExplainFalseEvenWithTrace(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\B::sink', 'Demo\B', 'src/A.php', 9, null),
+        ];
+        $finding = new Finding(
+            'cfg',
+            'Demo\A::go',
+            'Demo\B::sink',
+            TerminalKind::Used,
+            1,
+            $chain,
+            2,
+            [],
+            ['resolved Demo\A::go -> Demo\B::sink via interface Demo\I'],
+        );
+
+        $expected = <<<'TXT'
+src/A.php
+
+FINDING  $cfg: 1 pass-through hop across 2 classes
+  origin    Demo\A::go($cfg)    src/A.php:5
+  terminal  Demo\B::sink($cfg)  src/A.php:9  (used)
+
+----------------------------------------------------------------
+
+1 finding (limit: 1 hop).
+
+TXT;
+
+        $reporter = new PrettyReporter(
+            new Thresholds(1, null),
+            new Paths('/nonexistent-root'),
+            false,
+            new NullStyler(),
+        );
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
+    /**
+     * With AnsiStyler injected, `*YOURS*` must route through `annotation()`
+     * (bold-magenta) and `(stored)` through `terminalKind()` (dim-green). The
+     * NullStyler fixtures cannot distinguish the two routes because both
+     * return their input unchanged; this exact-byte assertion pins the
+     * ternary in hopLine() against a branch swap.
+     */
+    public function testAnsiStylerRoutesYoursToAnnotationAndTerminalKindToTerminalKind(): void
+    {
+        $chain = [
+            new Hop('Demo\Controller::handle', 'Demo\Controller', 'src/Demo.php', 12, 14),
+            new Hop('Demo\ServiceA::process', 'Demo\ServiceA', 'src/Demo.php', 18, 20, true),
+            new Hop('Demo\ServiceB::run', 'Demo\ServiceB', 'src/Demo.php', 24, 26),
+            new Hop('Demo\Mailer::__construct', 'Demo\Mailer', 'src/Demo.php', 32, null),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Controller::handle',
+            'Demo\Mailer::__construct',
+            TerminalKind::Stored,
+            3,
+            $chain,
+            4,
+            [],
+            [],
+        );
+
+        $expected = <<<TXT
+\e[1;34msrc/Demo.php\e[0m
+
+\e[1;31mFINDING\e[0m  \$\e[1mconfig\e[0m: 3 pass-through hops across 4 classes
+  \e[2morigin  \e[0m  Demo\Controller::handle(\$\e[36mconfig\e[0m)   \e[2msrc/Demo.php:12\e[0m
+  \e[2mhop 2   \e[0m  Demo\ServiceA::process(\$\e[36mconfig\e[0m)    \e[2msrc/Demo.php:18\e[0m  \e[1;35m*YOURS*\e[0m
+  \e[2mhop 3   \e[0m  Demo\ServiceB::run(\$\e[36mconfig\e[0m)        \e[2msrc/Demo.php:24\e[0m
+  \e[2mterminal\e[0m  Demo\Mailer::__construct(\$\e[36mconfig\e[0m)  \e[2msrc/Demo.php:32\e[0m  \e[2;32m(stored)\e[0m
+
+\e[2m----------------------------------------------------------------\e[0m
+
+\e[1m1 finding (limit: 3 hops).\e[0m
+
+TXT;
+
+        $reporter = new PrettyReporter(
+            new Thresholds(3, null),
+            new Paths('/nonexistent-root'),
+            false,
+            new AnsiStyler(),
+        );
+
+        self::assertSame($expected, $reporter->render([$finding]));
     }
 }
