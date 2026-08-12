@@ -414,6 +414,9 @@ final class Application
 
     private static function helpText(): string
     {
+        // The help text is an aligned heredoc whose --format option list and
+        // status footer are locked verbatim and unavoidably exceed 120 chars.
+        // phpcs:disable Generic.Files.LineLength.TooLong
         return <<<'TXT'
             phptramp - detect tramp data in PHP codebases
 
@@ -433,7 +436,8 @@ final class Application
               --limit <n>               Fail on chains with >= n pass-through hops (default: 6)
               --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops (default: 4; 0 = off)
               --min-classes <n>         Only report chains traversing >= n distinct classes (default: 0 = off)
-              --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
+              --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
+              --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
               --explain                 Show why chains ended (call resolution trace)
 
             Diff-aware mode:
@@ -461,14 +465,14 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: v0.1.0 — cross-file chain reporting (six formats), diff-aware
-            mode (--changed-only / --git-base / --diff), baselining
-            (--generate-baseline / --baseline / --fail-on-stale),
+            Status: v0.1.0 — cross-file chain reporting (seven formats incl. pretty colored
+            terminal output), diff-aware mode (--changed-only / --git-base / --diff),
+            baselining (--generate-baseline / --baseline / --fail-on-stale),
             #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
-            config, --warn-limit, --min-classes, and a per-file index cache
-            (--no-cache / the `cache` config key) are all shipped. See
-            docs/plan.md.
+            config, --warn-limit, --min-classes, --color, and a per-file index cache
+            (--no-cache / the `cache` config key) are all shipped. See docs/plan.md.
 
             TXT;
+        // phpcs:enable Generic.Files.LineLength.TooLong
     }
 }

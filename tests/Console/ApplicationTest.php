@@ -94,7 +94,7 @@ final class ApplicationTest extends TestCase
         $help = self::contents($this->stdout);
         $documented = [
             '--folder', '--file', '--files', '--limit',
-            '--format', '--changed-only', '--baseline', '--no-cache', 'Exit codes',
+            '--format', '--color', '--changed-only', '--baseline', '--no-cache', 'Exit codes',
         ];
         foreach ($documented as $expected) {
             self::assertStringContainsString($expected, $help);

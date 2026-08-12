@@ -9,3 +9,22 @@ Version sections below are generated automatically when a release tag is pushed
 the git log and the merged pull requests.
 
 ## [Unreleased]
+
+### Added
+- `--format pretty`: colored, file-grouped, line-sorted terminal output. New
+  default when STDOUT is a TTY.
+- `--color=always|auto|never` flag (default `auto`). `NO_COLOR` environment
+  variable honored in `auto` mode; `always`/`never` are absolute.
+- `colorMode` config key in `phptramp.json` / `phptramp.dist.json`.
+
+### Changed
+- Default `--format` is now `pretty` (TTY-gated). Non-TTY invocations
+  (pipes, CI redirection) automatically use `text`. Pass `--format text`
+  explicitly to force the old default on a TTY.
+
+### Migration
+- If you snapshot `--format text` output against a baseline, no change is
+  needed — pipes get `text` automatically.
+- If you run `phptramp` interactively and pipe the default output, you now
+  get `text` (no ANSI) in the pipe. To force color into a pipe, pass
+  `--color=always`.
