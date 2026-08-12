@@ -239,4 +239,33 @@ final class ConfigLoaderTest extends TestCase
 
         (new ConfigLoader())->load($this->directory);
     }
+
+    public function testColorModeParsedFromConfig(): void
+    {
+        $this->writeConfig('phptramp.json', '{"colorMode": "always"}');
+
+        $options = (new ConfigLoader())->load($this->directory);
+
+        self::assertSame('always', $options->colorMode);
+    }
+
+    public function testColorModeMustBeAValidMode(): void
+    {
+        $this->writeConfig('phptramp.json', '{"colorMode": "purple"}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('config key "colorMode" must be one of: always, auto, never');
+
+        (new ConfigLoader())->load($this->directory);
+    }
+
+    public function testColorModeMustBeAString(): void
+    {
+        $this->writeConfig('phptramp.json', '{"colorMode": 3}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('config key "colorMode" must be one of: always, auto, never');
+
+        (new ConfigLoader())->load($this->directory);
+    }
 }
