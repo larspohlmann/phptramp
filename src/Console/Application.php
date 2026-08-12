@@ -23,12 +23,24 @@ use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
+use PhpTramp\Report\ColorPolicy;
 use PhpTramp\Report\ReporterFactory;
 use PhpTramp\Report\Severity;
 use PhpTramp\Report\Thresholds;
 use PhpTramp\Resolve\CallResolver;
 use PhpTramp\Resolve\ClassHierarchy;
 
+/**
+ * The CLI coordinator: parses argv, reads env/TTY (its exclusive jurisdiction),
+ * builds the index, runs the chain resolver, and dispatches findings to a
+ * reporter. Complexity concentrates here because it is the single seam where
+ * the outside world (argv, cwd, STDOUT/STDIN, NO_COLOR) meets the pure domain
+ * — splitting it would scatter env access, violating the rule that only
+ * Application touches stream_isatty/getenv. The ExcessiveClassComplexity rule
+ * is therefore deliberately suppressed here.
+ *
+ * @SuppressWarnings("ExcessiveClassComplexity")
+ */
 final class Application
 {
     public const NAME = 'phptramp';
@@ -126,6 +138,37 @@ final class Application
         return getcwd() ?: '.';
     }
 
+    /**
+     * NO_COLOR is honored only in auto mode (Q11 precedence): always/never
+     * are absolute. Any non-empty value disables color.
+     */
+    private function noColorSet(): bool
+    {
+        $value = getenv('NO_COLOR');
+
+        return $value !== false && $value !== '';
+    }
+
+    /**
+     * The default format is `pretty`, but piping into a file or another tool
+     * should produce clean text. Downgrade happens only when the user has not
+     * explicitly engaged with color (`--color=auto`, the implicit default):
+     * `--color=always` is the escape hatch to keep pretty through `less -R`,
+     * `--color=never` keeps plain pretty in a pipe. The original Options
+     * (user intent) is preserved everywhere else; only the reporter sees the
+     * downgraded copy.
+     */
+    private function downgradedOptions(Options $options): Options
+    {
+        $isImplicitPretty = $options->format === 'pretty' && $options->colorMode === 'auto';
+
+        if ($isImplicitPretty && ! stream_isatty($this->stdout)) {
+            return $options->withFormat('text');
+        }
+
+        return $options;
+    }
+
     private function analyze(Options $options): int
     {
         try {
@@ -133,7 +176,14 @@ final class Application
             $baselineFilter = new BaselineFilter();
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
-            $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
+            $reporter = (new ReporterFactory($this->workingDirectory()))->create(
+                $this->downgradedOptions($options),
+                ColorPolicy::from(
+                    $options->colorMode,
+                    stream_isatty($this->stdout),
+                    $this->noColorSet(),
+                ),
+            );
             $suppression = (new SuppressionFilter($index->suppressions()))->filter(
                 $this->changedOnlyFindings($this->findChains($index), $options),
             );
@@ -364,6 +414,9 @@ final class Application
 
     private static function helpText(): string
     {
+        // The help text is an aligned heredoc whose --format option list and
+        // status footer are locked verbatim and unavoidably exceed 120 chars.
+        // phpcs:disable Generic.Files.LineLength.TooLong
         return <<<'TXT'
             phptramp - detect tramp data in PHP codebases
 
@@ -383,7 +436,8 @@ final class Application
               --limit <n>               Fail on chains with >= n pass-through hops (default: 6)
               --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops (default: 4; 0 = off)
               --min-classes <n>         Only report chains traversing >= n distinct classes (default: 0 = off)
-              --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
+              --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
+              --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
               --explain                 Show why chains ended (call resolution trace)
 
             Diff-aware mode:
@@ -411,14 +465,14 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: v0.1.0 — cross-file chain reporting (six formats), diff-aware
-            mode (--changed-only / --git-base / --diff), baselining
-            (--generate-baseline / --baseline / --fail-on-stale),
+            Status: v0.1.0 — cross-file chain reporting (seven formats incl. pretty colored
+            terminal output), diff-aware mode (--changed-only / --git-base / --diff),
+            baselining (--generate-baseline / --baseline / --fail-on-stale),
             #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
-            config, --warn-limit, --min-classes, and a per-file index cache
-            (--no-cache / the `cache` config key) are all shipped. See
-            docs/plan.md.
+            config, --warn-limit, --min-classes, --color, and a per-file index cache
+            (--no-cache / the `cache` config key) are all shipped. See docs/plan.md.
 
             TXT;
+        // phpcs:enable Generic.Files.LineLength.TooLong
     }
 }

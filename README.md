@@ -6,7 +6,7 @@
 
 **Status: v0.1.0** — the first release. phptramp detects tramp data across
 file boundaries: `phptramp --folder src` stitches forwarding chains across files
-and prints findings in any of six formats, exiting `0`/`1`/`2`. A
+and prints findings in any of seven formats, exiting `0`/`1`/`2`. A
 `phptramp.json` config file, `#[TrampIgnore]`/`// phptramp-ignore` suppression,
 and a `--warn-limit` warning tier are all wired up. Diff-aware mode
 (`--changed-only`/`--git-base`/`--diff`) and baselining
@@ -102,7 +102,8 @@ phptramp [options]
   --limit <n>               Fail on chains with >= n pass-through hops (default: 6)
   --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops (default: 4; 0 = off)
   --min-classes <n>         Only report chains traversing >= n distinct classes (default: 0 = off)
-  --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
+  --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
+  --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
   --explain                 Show why chains ended (call resolution trace)
   --changed-only            Only report chains touching changed lines
   --git-base <ref>          Diff base for --changed-only (default: origin/main)
@@ -181,12 +182,20 @@ enables.
 
 ## Output formats
 
-`--format` selects the renderer; all six are implemented and each has an exact-string
+`--format` selects the renderer; all seven are implemented and each has an exact-string
 unit test. `json` is additionally exercised end-to-end by the `tests/fixtures/` harness,
 which always runs with `--format json`.
 
+`pretty` is the default when STDOUT is a TTY. In `--color=auto` (the default),
+non-TTY invocations (pipes, CI redirection) fall back to `text` automatically.
+`--color=never` keeps plain `pretty` in a pipe; `--color=always` keeps colored
+`pretty` (the escape hatch for piping into `less -R`). Use `--color=never` to
+suppress color on a TTY, or set the `NO_COLOR` environment variable. `NO_COLOR`
+is honored only in `auto`; `always` and `never` are absolute.
+
 | Format | One-line example |
 |---|---|
+| `pretty` | `src/Demo.php` (bold-blue file header) / `FINDING  $config: 3 pass-through hops across 4 classes` (colored, grouped by file) |
 | `text` | `FINDING  $config: 3 pass-through hops across 4 classes` |
 | `json` | `{"limit":3,"warnLimit":null,"findings":[{"param":"config","severity":"error","hops":3,...}]}` |
 | `github` | `::error file=src/Demo.php,line=12,title=phptramp%3A%3A$config%3A 3 pass-through hops across 4 classes (terminal%3A Demo\Mailer%3A%3A__construct [stored])` |

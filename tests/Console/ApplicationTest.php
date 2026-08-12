@@ -94,7 +94,7 @@ final class ApplicationTest extends TestCase
         $help = self::contents($this->stdout);
         $documented = [
             '--folder', '--file', '--files', '--limit',
-            '--format', '--changed-only', '--baseline', '--no-cache', 'Exit codes',
+            '--format', '--color', '--changed-only', '--baseline', '--no-cache', 'Exit codes',
         ];
         foreach ($documented as $expected) {
             self::assertStringContainsString($expected, $help);
@@ -191,6 +191,98 @@ final class ApplicationTest extends TestCase
         $output = self::contents($this->stdout);
         self::assertStringContainsString('"findings"', $output);
         self::assertStringContainsString('"severity": "error"', $output);
+    }
+
+    public function testPrettyFormatWithColorAlwaysEmitsAnsiOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runPretty('--color=always');
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString("\e[1;31mFINDING\e[0m", $out);
+    }
+
+    public function testPrettyFormatWithColorNeverOmitsAnsiOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runPretty('--color=never');
+
+        self::assertSame(1, $exitCode);
+        self::assertStringNotContainsString("\e[", $out);
+    }
+
+    public function testColorAutoDowngradesPrettyToTextOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runPretty('--color=auto');
+
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsWith('FINDING', $out);
+        self::assertStringNotContainsString("\e[", $out);
+    }
+
+    public function testDefaultFormatDowngradesToTextOnNonTty(): void
+    {
+        // No --format flag: default is 'pretty', but STDOUT is php://memory
+        // (non-TTY) and the colorMode is the implicit 'auto' default, so
+        // Application downgrades to 'text'. Text output starts with 'FINDING'.
+        [$exitCode, $out] = $this->runWithDefaults();
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsWith('FINDING', $out);
+    }
+
+    public function testExplicitFormatTextIsHonoredEvenOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runWithDefaults('--format', 'text');
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsWith('FINDING', $out);
+    }
+
+    public function testExplicitFormatPrettyIsHonoredOnNonTty(): void
+    {
+        // Explicit --color=never engages with color, so the non-TTY downgrade
+        // (gated on colorMode === 'auto') does NOT apply: pretty is honored.
+        [$exitCode, $out] = $this->runWithDefaults('--format', 'pretty', '--color=never');
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsNotWith('FINDING', $out);
+    }
+
+    /**
+     * Mirror the existing fixture idiom from testJsonFormatReportsFindingsAndExitsOne:
+     * fixtureWithThreeHopChain() + --limit 3 --warn-limit 0 guarantees one
+     * error-severity finding on a non-TTY memory stream. The pretty format and
+     * a --color flag select the Styler path under test.
+     *
+     * @return array{0: int, 1: string}
+     */
+    private function runPretty(string $colorFlag): array
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--format', 'pretty', $colorFlag,
+        ]);
+
+        return [$exitCode, self::contents($this->stdout)];
+    }
+
+    /**
+     * Like {@see runPretty} but defaults the format to 'pretty' (the new
+     * global default) and lets extra args override it. Used by the
+     * non-TTY-downgrade tests to exercise the implicit default path.
+     *
+     * @param list<string> $extraArgs
+     * @return array{0: int, 1: string}
+     */
+    private function runWithDefaults(string ...$extraArgs): array
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        $exitCode = $this->app->run(array_merge([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+        ], $extraArgs));
+
+        return [$exitCode, self::contents($this->stdout)];
     }
 
     public function testWarnOnlyRunExitsZeroButPrintsWarning(): void

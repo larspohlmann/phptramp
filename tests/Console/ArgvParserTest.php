@@ -24,7 +24,8 @@ final class ArgvParserTest extends TestCase
         self::assertSame(6, $o->limit);
         self::assertSame(4, $o->warnLimit);
         self::assertSame(0, $o->minClasses);
-        self::assertSame('text', $o->format);
+        self::assertSame('pretty', $o->format);
+        self::assertSame('auto', $o->colorMode);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
         self::assertSame('origin/main', $o->gitBase);
@@ -98,7 +99,7 @@ final class ArgvParserTest extends TestCase
      */
     public static function validFormatProvider(): iterable
     {
-        foreach (['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
+        foreach (['text', 'pretty', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
             yield $format => [$format];
         }
     }
@@ -330,5 +331,36 @@ final class ArgvParserTest extends TestCase
         self::assertSame('json', $options->format);
         self::assertSame('develop', $options->gitBase);
         self::assertSame(5, $options->limit);
+    }
+
+    public function testColorModeDefaultsToAuto(): void
+    {
+        self::assertSame('auto', $this->parse()->colorMode);
+    }
+
+    public function testColorAlwaysParsed(): void
+    {
+        self::assertSame('always', $this->parse('--color', 'always')->colorMode);
+    }
+
+    public function testColorEqualsSyntaxWorks(): void
+    {
+        self::assertSame('never', $this->parse('--color=never')->colorMode);
+    }
+
+    public function testUnknownColorModeThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--color', 'purple');
+    }
+
+    public function testUnknownColorModeMessageNamesTheValue(): void
+    {
+        try {
+            $this->parse('--color', 'purple');
+            self::fail('expected InvalidArgsException');
+        } catch (InvalidArgsException $e) {
+            self::assertStringContainsString('purple', $e->getMessage());
+        }
     }
 }

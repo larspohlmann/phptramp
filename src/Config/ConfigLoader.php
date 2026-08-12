@@ -91,6 +91,7 @@ final class ConfigLoader
         $format = $defaults->format;
         $baseline = $defaults->baseline;
         $cacheDir = $defaults->cacheDir;
+        $colorMode = $defaults->colorMode;
 
         foreach ($config as $key => $value) {
             match ($key) {
@@ -102,6 +103,7 @@ final class ConfigLoader
                 'format' => $format = $this->requireString('format', $value),
                 'baseline' => $baseline = $this->requireString('baseline', $value),
                 'cache' => $cacheDir = $this->requireString('cache', $value),
+                'colorMode' => $colorMode = $this->requireColorMode('colorMode', $value),
                 default => throw new ConfigException("unknown config key: {$key}"),
             };
         }
@@ -116,6 +118,7 @@ final class ConfigLoader
             baseline: $baseline,
             exclude: $exclude,
             cacheDir: $cacheDir,
+            colorMode: $colorMode,
         );
     }
 
@@ -169,6 +172,20 @@ final class ConfigLoader
     {
         if (! is_string($value)) {
             throw new ConfigException("config key \"{$key}\" must be a string");
+        }
+
+        return $value;
+    }
+
+    private function requireColorMode(string $key, mixed $value): string
+    {
+        if (! is_string($value)) {
+            throw new ConfigException("config key \"{$key}\" must be a string");
+        }
+
+        $valid = ['always', 'auto', 'never'];
+        if (! in_array($value, $valid, true)) {
+            throw new ConfigException("config key \"{$key}\" must be one of: always, auto, never");
         }
 
         return $value;

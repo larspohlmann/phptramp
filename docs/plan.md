@@ -224,10 +224,12 @@ testable, and debuggable before any chain logic exists.
   it, prints the message to stderr, exits 2.
   `Options` readonly properties: `list<string> $folders = []`,
   `list<string> $files = []`, `int $limit = 3`, `?int $warnLimit = null`,
-  `string $format = 'text'`, `bool $explain = false`, `bool $changedOnly = false`,
+  `string $format = 'pretty'`, `bool $explain = false`, `bool $changedOnly = false`,
   `string $gitBase = 'origin/main'`, `?string $baseline = null`,
   `?string $generateBaseline = null`, `bool $dumpIndex = false`,
-  `bool $help = false`, `bool $version = false`.
+  `bool $help = false`, `bool $version = false`. (Default flipped from `text`
+  to `pretty` in Phase 3; `Application` downgrades `pretty` → `text` on
+  non-TTY STDOUT when `--color=auto`, so pipes/CI stay plain.)
 
 - [x] **Step 1: Write the failing tests** (`tests/Console/ArgvParserTest.php`):
 
@@ -257,7 +259,7 @@ final class ArgvParserTest extends TestCase
         self::assertSame([], $o->files);
         self::assertSame(3, $o->limit);
         self::assertNull($o->warnLimit);
-        self::assertSame('text', $o->format);
+        self::assertSame('pretty', $o->format);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
         self::assertSame('origin/main', $o->gitBase);
