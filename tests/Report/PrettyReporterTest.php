@@ -71,9 +71,9 @@ final class PrettyReporterTest extends TestCase
 src/Demo.php
 
 FINDING  $config: 3 pass-through hops across 4 classes
-  origin    Demo\Controller::handle($config)   src/Demo.php:12
-  hop 2     Demo\ServiceA::process($config)    src/Demo.php:18
-  hop 3     Demo\ServiceB::run($config)        src/Demo.php:24
+  origin    Demo\Controller::handle($config)   src/Demo.php:12→14
+  hop 2     Demo\ServiceA::process($config)    src/Demo.php:18→20
+  hop 3     Demo\ServiceB::run($config)        src/Demo.php:24→26
   terminal  Demo\Mailer::__construct($config)  src/Demo.php:32  (stored)
 
 ----------------------------------------------------------------
@@ -106,7 +106,7 @@ TXT;
 src/A.php
 
 WARNING  $cfg: 1 pass-through hop across 2 classes
-  origin    Demo\A::go($cfg)    src/A.php:5
+  origin    Demo\A::go($cfg)    src/A.php:5→7
   terminal  Demo\B::step($cfg)  src/B.php:9  (used)
 
 ----------------------------------------------------------------
@@ -150,9 +150,9 @@ TXT;
 src/Demo.php
 
 FINDING  $config: 3 pass-through hops across 4 classes
-  origin    Demo\Controller::handle($config)   src/Demo.php:12
-  hop 2     Demo\ServiceA::process($config)    src/Demo.php:18  *YOURS*
-  hop 3     Demo\ServiceB::run($config)        src/Demo.php:24
+  origin    Demo\Controller::handle($config)   src/Demo.php:12→14
+  hop 2     Demo\ServiceA::process($config)    src/Demo.php:18→20  *YOURS*
+  hop 3     Demo\ServiceB::run($config)        src/Demo.php:24→26
   terminal  Demo\Mailer::__construct($config)  src/Demo.php:32  (stored)
 
 ----------------------------------------------------------------
@@ -224,11 +224,11 @@ TXT;
 src/Demo.php
 
 FINDING  $early: 1 pass-through hop across 2 classes
-  origin    Demo\A::go($early)    src/Demo.php:5
+  origin    Demo\A::go($early)    src/Demo.php:5→7
   terminal  Demo\B::sink($early)  src/Demo.php:9  (used)
 
 FINDING  $late: 1 pass-through hop across 2 classes
-  origin    Demo\C::run($late)  src/Demo.php:12
+  origin    Demo\C::run($late)  src/Demo.php:12→14
   terminal  Demo\D::end($late)  src/Demo.php:16  (used)
 
 ----------------------------------------------------------------
@@ -236,7 +236,7 @@ FINDING  $late: 1 pass-through hop across 2 classes
 src/Other.php
 
 FINDING  $flag: 1 pass-through hop across 2 classes
-  origin    Demo\X::go($flag)    src/Other.php:5
+  origin    Demo\X::go($flag)    src/Other.php:5→7
   terminal  Demo\Y::sink($flag)  src/Other.php:9  (used)
 
 ----------------------------------------------------------------
@@ -279,8 +279,8 @@ TXT;
 src/A.php
 
 FINDING  $cfg: 2 pass-through hops across 2 classes
-  origin    Demo\A::go($cfg)    src/A.php:5
-  hop 2     Demo\B::step($cfg)  src/B.php:9
+  origin    Demo\A::go($cfg)    src/A.php:5→7
+  hop 2     Demo\B::step($cfg)  src/B.php:9→11
   note      truncated: 2 implementations
 
 ----------------------------------------------------------------
@@ -322,7 +322,7 @@ TXT;
 src/A.php
 
 FINDING  $cfg: 1 pass-through hop across 2 classes
-  origin    Demo\A::go($cfg)    src/A.php:5
+  origin    Demo\A::go($cfg)    src/A.php:5→7
   terminal  Demo\B::sink($cfg)  src/A.php:9  (used)
   explain:
     resolved Demo\A::go -> Demo\B::sink via interface Demo\I
@@ -384,13 +384,13 @@ TXT;
 src/A.php
 
 FINDING  $a: 3 pass-through hops across 4 classes
-  origin    Demo\A::go($a)    src/A.php:5
-  hop 2     Demo\B::step($a)  src/A.php:9
-  hop 3     Demo\C::mid($a)   src/A.php:13
+  origin    Demo\A::go($a)    src/A.php:5→7
+  hop 2     Demo\B::step($a)  src/A.php:9→11
+  hop 3     Demo\C::mid($a)   src/A.php:13→15
   terminal  Demo\D::sink($a)  src/A.php:17  (used)
 
 WARNING  $b: 1 pass-through hop across 2 classes
-  origin    Demo\A::go($b)    src/A.php:5
+  origin    Demo\A::go($b)    src/A.php:5→7
   terminal  Demo\C::sink($b)  src/A.php:13  (used)
 
 ----------------------------------------------------------------
@@ -503,7 +503,7 @@ TXT;
 src/A.php
 
 FINDING  $cfg: 1 pass-through hop across 2 classes
-  origin    Demo\A::go($cfg)    src/A.php:5
+  origin    Demo\A::go($cfg)    src/A.php:5→7
   terminal  Demo\B::sink($cfg)  src/A.php:9  (used)
 
 ----------------------------------------------------------------
@@ -553,9 +553,9 @@ TXT;
 \e[1;34msrc/Demo.php\e[0m
 
 \e[1;31mFINDING\e[0m  \$\e[1mconfig\e[0m: 3 pass-through hops across 4 classes
-  \e[2morigin  \e[0m  Demo\Controller::handle(\$\e[36mconfig\e[0m)   \e[2msrc/Demo.php:12\e[0m
-  \e[2mhop 2   \e[0m  Demo\ServiceA::process(\$\e[36mconfig\e[0m)    \e[2msrc/Demo.php:18\e[0m  \e[1;35m*YOURS*\e[0m
-  \e[2mhop 3   \e[0m  Demo\ServiceB::run(\$\e[36mconfig\e[0m)        \e[2msrc/Demo.php:24\e[0m
+  \e[2morigin  \e[0m  Demo\Controller::handle(\$\e[36mconfig\e[0m)   \e[2msrc/Demo.php:12→14\e[0m
+  \e[2mhop 2   \e[0m  Demo\ServiceA::process(\$\e[36mconfig\e[0m)    \e[2msrc/Demo.php:18→20\e[0m  \e[1;35m*YOURS*\e[0m
+  \e[2mhop 3   \e[0m  Demo\ServiceB::run(\$\e[36mconfig\e[0m)        \e[2msrc/Demo.php:24→26\e[0m
   \e[2mterminal\e[0m  Demo\Mailer::__construct(\$\e[36mconfig\e[0m)  \e[2msrc/Demo.php:32\e[0m  \e[2;32m(stored)\e[0m
 
 \e[2m----------------------------------------------------------------\e[0m
