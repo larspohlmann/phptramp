@@ -234,6 +234,10 @@ final class TextReporter implements Reporter
             $clause .= ', warn-limit: ' . $this->thresholds->warnLimit
                 . ' ' . $this->pluralizer->of($this->thresholds->warnLimit, 'hop');
         }
+        if ($this->thresholds->minClasses > 0) {
+            $clause .= ', min-classes: ' . $this->thresholds->minClasses
+                . ' ' . $this->pluralizer->of($this->thresholds->minClasses, 'class', 'classes');
+        }
 
         return $clause;
     }
