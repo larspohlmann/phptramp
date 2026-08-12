@@ -46,7 +46,7 @@ final class ArgvParser
         '--no-cache',
     ];
 
-    private const VALID_FORMATS = ['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'];
+    private const VALID_FORMATS = ['text', 'pretty', 'json', 'github', 'checkstyle', 'sarif', 'summary'];
     private const VALID_COLOR_MODES = ['always', 'auto', 'never'];
 
     /** @var list<string> */

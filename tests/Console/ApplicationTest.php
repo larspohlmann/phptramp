@@ -193,6 +193,51 @@ final class ApplicationTest extends TestCase
         self::assertStringContainsString('"severity": "error"', $output);
     }
 
+    public function testPrettyFormatWithColorAlwaysEmitsAnsiOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runPretty('--color=always');
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString("\e[1;31mFINDING\e[0m", $out);
+    }
+
+    public function testPrettyFormatWithColorNeverOmitsAnsiOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runPretty('--color=never');
+
+        self::assertSame(1, $exitCode);
+        self::assertStringNotContainsString("\e[", $out);
+    }
+
+    public function testPrettyFormatWithColorAutoOmitsAnsiOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runPretty('--color=auto');
+
+        self::assertSame(1, $exitCode);
+        self::assertStringNotContainsString("\e[", $out);
+    }
+
+    /**
+     * Mirror the existing fixture idiom from testJsonFormatReportsFindingsAndExitsOne:
+     * fixtureWithThreeHopChain() + --limit 3 --warn-limit 0 guarantees one
+     * error-severity finding on a non-TTY memory stream. The pretty format and
+     * a --color flag select the Styler path under test.
+     *
+     * @return array{0: int, 1: string}
+     */
+    private function runPretty(string $colorFlag): array
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--format', 'pretty', $colorFlag,
+        ]);
+
+        return [$exitCode, self::contents($this->stdout)];
+    }
+
     public function testWarnOnlyRunExitsZeroButPrintsWarning(): void
     {
         $folder = $this->fixtureWithTwoHopChain();

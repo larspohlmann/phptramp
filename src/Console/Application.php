@@ -23,13 +23,24 @@ use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
-use PhpTramp\Report\NullStyler;
+use PhpTramp\Report\ColorPolicy;
 use PhpTramp\Report\ReporterFactory;
 use PhpTramp\Report\Severity;
 use PhpTramp\Report\Thresholds;
 use PhpTramp\Resolve\CallResolver;
 use PhpTramp\Resolve\ClassHierarchy;
 
+/**
+ * The CLI coordinator: parses argv, reads env/TTY (its exclusive jurisdiction),
+ * builds the index, runs the chain resolver, and dispatches findings to a
+ * reporter. Complexity concentrates here because it is the single seam where
+ * the outside world (argv, cwd, STDOUT/STDIN, NO_COLOR) meets the pure domain
+ * — splitting it would scatter env access, violating the rule that only
+ * Application touches stream_isatty/getenv. The ExcessiveClassComplexity rule
+ * is therefore deliberately suppressed here.
+ *
+ * @SuppressWarnings("ExcessiveClassComplexity")
+ */
 final class Application
 {
     public const NAME = 'phptramp';
@@ -127,6 +138,17 @@ final class Application
         return getcwd() ?: '.';
     }
 
+    /**
+     * NO_COLOR is honored only in auto mode (Q11 precedence): always/never
+     * are absolute. Any non-empty value disables color.
+     */
+    private function noColorSet(): bool
+    {
+        $value = getenv('NO_COLOR');
+
+        return $value !== false && $value !== '';
+    }
+
     private function analyze(Options $options): int
     {
         try {
@@ -134,7 +156,14 @@ final class Application
             $baselineFilter = new BaselineFilter();
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
-            $reporter = (new ReporterFactory($this->workingDirectory()))->create($options, new NullStyler());
+            $reporter = (new ReporterFactory($this->workingDirectory()))->create(
+                $options,
+                ColorPolicy::from(
+                    $options->colorMode,
+                    stream_isatty($this->stdout),
+                    $this->noColorSet(),
+                ),
+            );
             $suppression = (new SuppressionFilter($index->suppressions()))->filter(
                 $this->changedOnlyFindings($this->findChains($index), $options),
             );
