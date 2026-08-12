@@ -112,11 +112,15 @@ final class SarifReporter implements Reporter
         $locations = [];
         for ($index = 1; $index < $finding->hops; $index++) {
             $hop = $finding->chain[$index];
-            $location = $this->location($hop);
-            $location['message'] = [
-                'text' => 'hop ' . ($index + 1) . ' of $' . $finding->param . ' chain from ' . $finding->origin,
+            $locations[] = [
+                'physicalLocation' => [
+                    'artifactLocation' => ['uri' => $this->paths->relativize($hop->file)],
+                    'region' => ['startLine' => $hop->forwardLine ?? $hop->line],
+                ],
+                'message' => [
+                    'text' => 'hop ' . ($index + 1) . ' of $' . $finding->param . ' chain from ' . $finding->origin,
+                ],
             ];
-            $locations[] = $location;
         }
 
         return $locations;

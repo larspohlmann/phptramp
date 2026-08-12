@@ -36,9 +36,9 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $config: 3 pass-through hops across 4 classes
-              origin    Demo\Controller::handle($config)   src/Demo.php:12
-              hop 2     Demo\ServiceA::process($config)    src/Demo.php:18
-              hop 3     Demo\ServiceB::run($config)        src/Demo.php:24
+              origin    Demo\Controller::handle($config)   src/Demo.php:12→14
+              hop 2     Demo\ServiceA::process($config)    src/Demo.php:18→20
+              hop 3     Demo\ServiceB::run($config)        src/Demo.php:24→26
               terminal  Demo\Mailer::__construct($config)  src/Demo.php:32  (stored)
 
             1 finding (limit: 3 hops).
@@ -72,9 +72,9 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $config: 3 pass-through hops across 4 classes
-              origin    Demo\Controller::handle($config)   src/Demo.php:12
-              hop 2     Demo\ServiceA::process($config)    src/Demo.php:18  *YOURS*
-              hop 3     Demo\ServiceB::run($config)        src/Demo.php:24
+              origin    Demo\Controller::handle($config)   src/Demo.php:12→14
+              hop 2     Demo\ServiceA::process($config)    src/Demo.php:18→20  *YOURS*
+              hop 3     Demo\ServiceB::run($config)        src/Demo.php:24→26
               terminal  Demo\Mailer::__construct($config)  src/Demo.php:32  (stored)
 
             1 finding (limit: 3 hops).
@@ -106,8 +106,8 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $cfg: 2 pass-through hops across 2 classes
-              origin    Demo\A::go($cfg)    src/A.php:5
-              hop 2     Demo\B::step($cfg)  src/B.php:9
+              origin    Demo\A::go($cfg)    src/A.php:5→7
+              hop 2     Demo\B::step($cfg)  src/B.php:9→11
               note      truncated: 2 implementations
 
             1 finding (limit: 2 hops).
@@ -129,7 +129,7 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $p: 1 pass-through hop across 1 class
-              origin    Demo\A::go($p)    src/A.php:5
+              origin    Demo\A::go($p)    src/A.php:5→7
               terminal  Demo\A::sink($p)  src/A.php:9  (used)
 
             1 finding (limit: 1 hop).
@@ -152,7 +152,7 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $p: 1 pass-through hop across 2 classes
-              origin    Demo\A::go($p)    src/A.php:5
+              origin    Demo\A::go($p)    src/A.php:5→7
               terminal  Demo\B::step($p)  src/B.php:9  (used)
               explain:
                 Demo\A::go: method:step -> Demo\B::step
@@ -213,8 +213,8 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             WARNING  $p: 2 pass-through hops across 2 classes
-              origin    Demo\A::go($p)    src/A.php:5
-              hop 2     Demo\B::step($p)  src/B.php:9
+              origin    Demo\A::go($p)    src/A.php:5→7
+              hop 2     Demo\B::step($p)  src/B.php:9→11
               terminal  Demo\C::sink($p)  src/C.php:13  (used)
 
             1 finding (0 errors, 1 warning; limit: 3 hops, warn-limit: 2 hops).
@@ -251,7 +251,7 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $p: 1 pass-through hop across 1 class
-              origin    Demo\A::go($p)    src/A.php:5
+              origin    Demo\A::go($p)    src/A.php:5→7
               terminal  Demo\A::sink($p)  src/A.php:9  (used)
 
             1 finding (limit: 1 hop, min-classes: 1 class).
@@ -304,14 +304,14 @@ final class TextReporterTest extends TestCase
 
         $expected = <<<'TXT'
             FINDING  $p: 3 pass-through hops across 3 classes
-              origin    Demo\A::go($p)    src/A.php:5
-              hop 2     Demo\B::step($p)  src/B.php:9
-              hop 3     Demo\Y::step($p)  src/Y.php:15
+              origin    Demo\A::go($p)    src/A.php:5→7
+              hop 2     Demo\B::step($p)  src/B.php:9→11
+              hop 3     Demo\Y::step($p)  src/Y.php:15→17
               terminal  Demo\C::sink($p)  src/C.php:13  (used)
 
             WARNING  $q: 2 pass-through hops across 2 classes
-              origin    Demo\D::go($q)    src/D.php:5
-              hop 2     Demo\E::step($q)  src/E.php:9
+              origin    Demo\D::go($q)    src/D.php:5→7
+              hop 2     Demo\E::step($q)  src/E.php:9→11
               terminal  Demo\F::sink($q)  src/F.php:13  (used)
 
             2 findings (1 error, 1 warning; limit: 3 hops, warn-limit: 2 hops).

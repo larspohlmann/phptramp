@@ -671,7 +671,11 @@ Tasks (expanded in `docs/plans/phase-2.md`):
   3. **Branching:** every outgoing edge is explored; each root-to-terminal path is its
      own Finding. A param forwarded to two callees therefore yields two findings —
      they share the origin but differ in terminal, which is what the baseline
-     fingerprint keys on.
+     fingerprint keys on. A param forwarded to the same callee via multiple call
+     sites within one method yields one Finding per call site; they share origin,
+     param, and terminal and differ only in the divergent hop's `forwardLine`,
+     which every reporter surfaces. They share a fingerprint (the fingerprint
+     excludes lines by design).
   4. **Terminals:** child fate `Used` → terminal kind `used` (or `stored` when the
      body is a single property assignment); `ByRefTerminated` → `&-terminated`;
      `Unused` → `unused-end` (dead forwarding — the value goes nowhere); leaf from

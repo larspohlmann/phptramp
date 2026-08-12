@@ -21,9 +21,9 @@ index remain inspectable via `--dump-index`.
 $ vendor/bin/phptramp --folder src --limit 3
 
 FINDING  $config: 3 pass-through hops across 4 classes
-  origin    App\Http\Controller::handle($config)     src/Http/Controller.php:21
-  hop 2     App\Service\ServiceA::process($config)   src/Service/ServiceA.php:14
-  hop 3     App\Service\ServiceB::run($config)       src/Service/ServiceB.php:9
+  origin    App\Http\Controller::handle($config)     src/Http/Controller.php:21→23
+  hop 2     App\Service\ServiceA::process($config)   src/Service/ServiceA.php:14→16
+  hop 3     App\Service\ServiceB::run($config)       src/Service/ServiceB.php:9→11
   terminal  App\Mail\Mailer::__construct($config)    src/Mail/Mailer.php:12  (stored)
 ```
 
@@ -47,13 +47,19 @@ hop's location line grows a `*YOURS*` annotation:
 $ vendor/bin/phptramp --folder src --changed-only --git-base origin/main
 
 FINDING  $config: 3 pass-through hops across 4 classes
-  origin    App\Http\Controller::handle($config)    src/Http/Controller.php:21
-  hop 2     App\Service\ServiceA::process($config)  src/Service/ServiceA.php:14  *YOURS*
-  hop 3     App\Service\ServiceB::run($config)      src/Service/ServiceB.php:9
+  origin    App\Http\Controller::handle($config)    src/Http/Controller.php:21→23
+  hop 2     App\Service\ServiceA::process($config)  src/Service/ServiceA.php:14→16  *YOURS*
+  hop 3     App\Service\ServiceB::run($config)      src/Service/ServiceB.php:9→11
   terminal  App\Mail\Mailer::__construct($config)   src/Mail/Mailer.php:12  (stored)
 
 1 finding (limit: 3 hops).
 ```
+
+The `→N` after a hop's `file:line` is the **forwarding call-site line** — the line
+inside that method where the parameter is forwarded on. Terminal hops have no
+forwarding call, so they show only `file:line`. When a method forwards the same
+parameter to the same callee via multiple call sites, each produces its own
+finding distinguished by this `→N` value.
 
 `--git-base <ref>` (default `origin/main`) supplies the diff via
 `git diff --unified=0 <ref>...HEAD` (three-dot, merge-base semantics); `--diff <path|->`

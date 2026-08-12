@@ -92,7 +92,7 @@ final class SarifReporterTest extends TestCase
                                                 "uri": "src/Demo.php"
                                             },
                                             "region": {
-                                                "startLine": 18
+                                                "startLine": 20
                                             }
                                         },
                                         "message": {
@@ -105,7 +105,7 @@ final class SarifReporterTest extends TestCase
                                                 "uri": "src/Demo.php"
                                             },
                                             "region": {
-                                                "startLine": 24
+                                                "startLine": 26
                                             }
                                         },
                                         "message": {

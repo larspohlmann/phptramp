@@ -148,7 +148,12 @@ final class TextReporter implements Reporter
 
     private function location(Hop $hop): string
     {
-        return $this->paths->relativize($hop->file) . ':' . $hop->line;
+        $location = $this->paths->relativize($hop->file) . ':' . $hop->line;
+        if ($hop->forwardLine !== null) {
+            $location .= '→' . $hop->forwardLine;
+        }
+
+        return $location;
     }
 
     /**

@@ -209,19 +209,21 @@ final class PrettyReporter implements Reporter
 
     private function label(int $index, bool $isTerminal): string
     {
-        if ($isTerminal) {
-            return 'terminal';
-        }
-        if ($index === 0) {
-            return 'origin';
-        }
-
-        return 'hop ' . ($index + 1);
+        return match (true) {
+            $isTerminal => 'terminal',
+            $index === 0 => 'origin',
+            default => 'hop ' . ($index + 1),
+        };
     }
 
     private function location(Hop $hop): string
     {
-        return $this->paths->relativize($hop->file) . ':' . $hop->line;
+        $location = $this->paths->relativize($hop->file) . ':' . $hop->line;
+        if ($hop->forwardLine !== null) {
+            $location .= '→' . $hop->forwardLine;
+        }
+
+        return $location;
     }
 
     /**

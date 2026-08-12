@@ -1,0 +1,39 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\Origin::run",
+            "terminal": "Demo\\Terminal::first",
+            "terminalKind": "used",
+            "hops": 3,
+            "classes": 4,
+            "chain": [
+                {"method": "Demo\\Origin::run", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\Middle::relay", "role": "hop", "file": "src/Demo.php", "line": 19, "forwardLine": 21},
+                {"method": "Demo\\Divergent::forwardTwice", "role": "hop", "file": "src/Demo.php", "line": 27, "forwardLine": 29},
+                {"method": "Demo\\Terminal::first", "role": "terminal", "file": "src/Demo.php", "line": 36, "forwardLine": null}
+            ],
+            "notes": []
+        },
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\Origin::run",
+            "terminal": "Demo\\Terminal::second",
+            "terminalKind": "used",
+            "hops": 3,
+            "classes": 4,
+            "chain": [
+                {"method": "Demo\\Origin::run", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\Middle::relay", "role": "hop", "file": "src/Demo.php", "line": 19, "forwardLine": 21},
+                {"method": "Demo\\Divergent::forwardTwice", "role": "hop", "file": "src/Demo.php", "line": 27, "forwardLine": 30},
+                {"method": "Demo\\Terminal::second", "role": "terminal", "file": "src/Demo.php", "line": 41, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}
