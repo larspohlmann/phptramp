@@ -85,7 +85,7 @@ composer tramp -- --format json --warn-limit 2
 
 This repository gates itself with exactly such a script: `composer tramp` runs
 `bin/phptramp` against the paths and thresholds in its own `phptramp.dist.json`
-(`paths: src`, `limit: 3`, `warn-limit: 2`), and CI fails the build on any finding at or
+(`paths: src`, `limit: 6`, `warn-limit: 4`), and CI fails the build on any finding at or
 over the limit. That is the same `composer tramp` invocation a consuming project gets from
 the snippet above — here the paths come from config, so no `--folder` is needed; a consumer
 can configure `paths` the same way or pass `--folder src` inline. (`--no-config` bypasses
@@ -99,8 +99,9 @@ phptramp [options]
   --folder <dir>            Analyze all .php files under <dir> (repeatable)
   --file <path>             Analyze a single file
   --files <a,b,c>           Comma-separated list of files
-  --limit <n>               Fail on chains with >= n pass-through hops (default: 3)
-  --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
+  --limit <n>               Fail on chains with >= n pass-through hops (default: 6)
+  --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops (default: 4; 0 = off)
+  --min-classes <n>         Only report chains traversing >= n distinct classes (default: 0 = off)
   --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
   --explain                 Show why chains ended (call resolution trace)
   --changed-only            Only report chains touching changed lines
@@ -127,6 +128,7 @@ key, or a value of the wrong type, is a config error rather than a silently igno
     "exclude": ["src/Legacy/*.php"],
     "limit": 3,
     "warnLimit": 2,
+    "minClasses": 0,
     "format": "json"
 }
 ```
@@ -137,6 +139,7 @@ key, or a value of the wrong type, is a config error rather than a silently igno
 | `exclude` | list of strings | `fnmatch` globs matched against each folder-discovered file's path, relative to the config file's directory; explicit files (`paths` entries ending in `.php`) are never excluded |
 | `limit` | integer | `--limit` |
 | `warnLimit` | integer | `--warn-limit` |
+| `minClasses` | integer | `--min-classes` |
 | `format` | string | `--format` |
 | `baseline` | string | `--baseline` |
 | `cache` | string | directory for the per-file index cache (default: `.phptramp.cache/`, resolved relative to the config file's directory) |
@@ -216,6 +219,11 @@ count falls in `[warn-limit, limit)` render at `severity: "warning"` (`WARNING` 
 `::warning` in the GitHub format, `"level": "warning"` in SARIF, …) but never fail the
 run — only chains at or over `--limit` set exit code `1`. Useful for tightening a hop
 budget gradually: warn today, promote to a hard failure once the codebase is clean.
+
+`0` disables the warn tier entirely (no warnings emitted); `--limit 0` likewise disables
+the fail tier, leaving only warnings. `--min-classes <n>` is a complementary filter:
+it suppresses any chain traversing fewer than `n` distinct classes regardless of
+severity, so you can scope a noisy warn tier to genuinely wide chains.
 
 ## Baseline
 

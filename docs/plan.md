@@ -86,8 +86,13 @@ implementation. Every bullet is a fixture.
 3. **Constructor storage is use.** `$this->x = $p` (incl. promoted properties) ends the
    chain at the constructor. "Field tramping" through properties is future work, not v0.1.
 4. **Threshold metric:** number of pure-forward methods in the chain (origin included if
-   it purely forwards; terminal never counted). Report when hops ≥ `--limit` (default 3).
-   Classes traversed is supplementary output, never the threshold.
+   it purely forwards; terminal never counted). Report when hops ≥ `--limit` (default 6
+   since v0.1.x; was 3 in the initial design review, raised after real-world use showed
+   3-hop chains are too common to gate by default). `--warn-limit` (default 4) adds a
+   warning tier below the limit. `--min-classes <n>` (default 0 = off) suppresses chains
+   traversing fewer than `n` distinct classes. `0` on either threshold disables that
+   tier. Classes traversed is supplementary output, never the primary threshold, but can
+   gate via `--min-classes`.
 5. **Call resolution (v0.1):** plain functions, `self::`/`static::`/`ClassName::`
    statics, `$this->m()`, calls on values with a single declared class type (params,
    typed properties, `new X`), constructors, trait methods (through `use`), named
