@@ -9,6 +9,7 @@ use PhpTramp\Chain\Hop;
 use PhpTramp\Chain\TerminalKind;
 use PhpTramp\Console\InvalidArgsException;
 use PhpTramp\Console\Options;
+use PhpTramp\Report\NullStyler;
 use PhpTramp\Report\ReporterFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -39,7 +40,7 @@ final class ReporterFactoryTest extends TestCase
     public function testGithubFormatRoutesToGithubReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'github', limit: 2, warnLimit: 0));
+        $reporter = $factory->create(new Options(format: 'github', limit: 2, warnLimit: 0), new NullStyler());
 
         self::assertStringContainsString('::error', $reporter->render($this->qualifyingFinding()));
     }
@@ -47,7 +48,7 @@ final class ReporterFactoryTest extends TestCase
     public function testCheckstyleFormatRoutesToCheckstyleReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'checkstyle', limit: 2, warnLimit: 0));
+        $reporter = $factory->create(new Options(format: 'checkstyle', limit: 2, warnLimit: 0), new NullStyler());
 
         self::assertStringContainsString('<checkstyle', $reporter->render($this->qualifyingFinding()));
     }
@@ -55,7 +56,7 @@ final class ReporterFactoryTest extends TestCase
     public function testSarifFormatRoutesToSarifReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'sarif', limit: 2, warnLimit: 0));
+        $reporter = $factory->create(new Options(format: 'sarif', limit: 2, warnLimit: 0), new NullStyler());
 
         self::assertStringContainsString('"phptramp.trampData"', $reporter->render($this->qualifyingFinding()));
     }
@@ -63,9 +64,17 @@ final class ReporterFactoryTest extends TestCase
     public function testSummaryFormatRoutesToSummaryReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'summary', limit: 2, warnLimit: 0));
+        $reporter = $factory->create(new Options(format: 'summary', limit: 2, warnLimit: 0), new NullStyler());
 
         self::assertStringContainsString('at or over the limit', $reporter->render($this->qualifyingFinding()));
+    }
+
+    public function testPrettyFormatRoutesToPrettyReporter(): void
+    {
+        $factory = new ReporterFactory('/not/matching');
+        $reporter = $factory->create(new Options(format: 'pretty', limit: 2, warnLimit: 0), new NullStyler());
+
+        self::assertStringContainsString('FINDING', $reporter->render($this->qualifyingFinding()));
     }
 
     /**
@@ -80,6 +89,6 @@ final class ReporterFactoryTest extends TestCase
         $this->expectException(InvalidArgsException::class);
         $this->expectExceptionMessage("format 'xml' is not implemented yet.");
 
-        $factory->create(new Options(format: 'xml'));
+        $factory->create(new Options(format: 'xml'), new NullStyler());
     }
 }

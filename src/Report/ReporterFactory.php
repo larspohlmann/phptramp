@@ -13,16 +13,18 @@ final class ReporterFactory
     {
     }
 
-    public function create(Options $options): Reporter
+    public function create(Options $options, Styler $styler): Reporter
     {
         $thresholds = new Thresholds($options->limit, $options->warnLimit, $options->minClasses);
+        $paths = new Paths($this->workingDirectory);
 
         return match ($options->format) {
-            'text' => new TextReporter($thresholds, new Paths($this->workingDirectory), $options->explain),
-            'json' => new JsonReporter($thresholds, new Paths($this->workingDirectory), $options->changedOnly),
-            'github' => new GithubReporter($thresholds, new Paths($this->workingDirectory)),
-            'checkstyle' => new CheckstyleReporter($thresholds, new Paths($this->workingDirectory)),
-            'sarif' => new SarifReporter($thresholds, new Paths($this->workingDirectory)),
+            'text' => new TextReporter($thresholds, $paths, $options->explain),
+            'pretty' => new PrettyReporter($thresholds, $paths, $options->explain, $styler),
+            'json' => new JsonReporter($thresholds, $paths, $options->changedOnly),
+            'github' => new GithubReporter($thresholds, $paths),
+            'checkstyle' => new CheckstyleReporter($thresholds, $paths),
+            'sarif' => new SarifReporter($thresholds, $paths),
             'summary' => new SummaryReporter($thresholds),
             // Unreachable: ArgvParser::validateFormat rejects any format outside
             // VALID_FORMATS at parse time, so every case above is exhaustive.

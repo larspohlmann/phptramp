@@ -23,6 +23,7 @@ use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
+use PhpTramp\Report\NullStyler;
 use PhpTramp\Report\ReporterFactory;
 use PhpTramp\Report\Severity;
 use PhpTramp\Report\Thresholds;
@@ -133,7 +134,7 @@ final class Application
             $baselineFilter = new BaselineFilter();
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
-            $reporter = (new ReporterFactory($this->workingDirectory()))->create($options);
+            $reporter = (new ReporterFactory($this->workingDirectory()))->create($options, new NullStyler());
             $suppression = (new SuppressionFilter($index->suppressions()))->filter(
                 $this->changedOnlyFindings($this->findChains($index), $options),
             );
