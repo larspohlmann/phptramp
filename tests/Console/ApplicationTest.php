@@ -217,6 +217,32 @@ final class ApplicationTest extends TestCase
         self::assertStringNotContainsString("\e[", $out);
     }
 
+    public function testDefaultFormatDowngradesToTextOnNonTty(): void
+    {
+        // No --format flag: default is 'pretty', but STDOUT is php://memory
+        // (non-TTY) and the colorMode is the implicit 'auto' default, so
+        // Application downgrades to 'text'. Text output starts with 'FINDING'.
+        [$exitCode, $out] = $this->runWithDefaults();
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsWith('FINDING', $out);
+    }
+
+    public function testExplicitFormatTextIsHonoredEvenOnNonTty(): void
+    {
+        [$exitCode, $out] = $this->runWithDefaults('--format', 'text');
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsWith('FINDING', $out);
+    }
+
+    public function testExplicitFormatPrettyIsHonoredOnNonTty(): void
+    {
+        // Explicit --color=never engages with color, so the non-TTY downgrade
+        // (gated on colorMode === 'auto') does NOT apply: pretty is honored.
+        [$exitCode, $out] = $this->runWithDefaults('--format', 'pretty', '--color=never');
+        self::assertSame(1, $exitCode);
+        self::assertStringStartsNotWith('FINDING', $out);
+    }
+
     /**
      * Mirror the existing fixture idiom from testJsonFormatReportsFindingsAndExitsOne:
      * fixtureWithThreeHopChain() + --limit 3 --warn-limit 0 guarantees one
@@ -234,6 +260,26 @@ final class ApplicationTest extends TestCase
             '--limit', '3', '--warn-limit', '0',
             '--format', 'pretty', $colorFlag,
         ]);
+
+        return [$exitCode, self::contents($this->stdout)];
+    }
+
+    /**
+     * Like {@see runPretty} but defaults the format to 'pretty' (the new
+     * global default) and lets extra args override it. Used by the
+     * non-TTY-downgrade tests to exercise the implicit default path.
+     *
+     * @param list<string> $extraArgs
+     * @return array{0: int, 1: string}
+     */
+    private function runWithDefaults(string ...$extraArgs): array
+    {
+        $folder = $this->fixtureWithThreeHopChain();
+
+        $exitCode = $this->app->run(array_merge([
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+        ], $extraArgs));
 
         return [$exitCode, self::contents($this->stdout)];
     }

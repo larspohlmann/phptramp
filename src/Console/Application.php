@@ -149,6 +149,26 @@ final class Application
         return $value !== false && $value !== '';
     }
 
+    /**
+     * The default format is `pretty`, but piping into a file or another tool
+     * should produce clean text. Downgrade happens only when the user has not
+     * explicitly engaged with color (`--color=auto`, the implicit default):
+     * `--color=always` is the escape hatch to keep pretty through `less -R`,
+     * `--color=never` keeps plain pretty in a pipe. The original Options
+     * (user intent) is preserved everywhere else; only the reporter sees the
+     * downgraded copy.
+     */
+    private function downgradedOptions(Options $options): Options
+    {
+        $isImplicitPretty = $options->format === 'pretty' && $options->colorMode === 'auto';
+
+        if ($isImplicitPretty && ! stream_isatty($this->stdout)) {
+            return $options->withFormat('text');
+        }
+
+        return $options;
+    }
+
     private function analyze(Options $options): int
     {
         try {
@@ -157,7 +177,7 @@ final class Application
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
             $reporter = (new ReporterFactory($this->workingDirectory()))->create(
-                $options,
+                $this->downgradedOptions($options),
                 ColorPolicy::from(
                     $options->colorMode,
                     stream_isatty($this->stdout),

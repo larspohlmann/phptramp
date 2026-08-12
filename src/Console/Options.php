@@ -25,7 +25,7 @@ final class Options
         public readonly int $limit = 6,
         public readonly ?int $warnLimit = 4,
         public readonly int $minClasses = 0,
-        public readonly string $format = 'text',
+        public readonly string $format = 'pretty',
         public readonly string $colorMode = 'auto',
         public readonly bool $explain = false,
         public readonly bool $changedOnly = false,
@@ -42,5 +42,37 @@ final class Options
         public readonly bool $noCache = false,
         public readonly string $cacheDir = '.phptramp.cache',
     ) {
+    }
+
+    /**
+     * An immutable copy that swaps only the format — so {@see Application}
+     * can apply its post-parse non-TTY downgrade without re-stating the full
+     * 22-parameter constructor. Mirrors {@see \PhpTramp\Chain\Finding::withChain()}.
+     */
+    public function withFormat(string $format): self
+    {
+        return new self(
+            folders: $this->folders,
+            files: $this->files,
+            limit: $this->limit,
+            warnLimit: $this->warnLimit,
+            minClasses: $this->minClasses,
+            format: $format,
+            colorMode: $this->colorMode,
+            explain: $this->explain,
+            changedOnly: $this->changedOnly,
+            gitBase: $this->gitBase,
+            diff: $this->diff,
+            baseline: $this->baseline,
+            generateBaseline: $this->generateBaseline,
+            dumpIndex: $this->dumpIndex,
+            noConfig: $this->noConfig,
+            help: $this->help,
+            version: $this->version,
+            failOnStale: $this->failOnStale,
+            exclude: $this->exclude,
+            noCache: $this->noCache,
+            cacheDir: $this->cacheDir,
+        );
     }
 }

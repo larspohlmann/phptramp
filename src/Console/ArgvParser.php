@@ -56,7 +56,7 @@ final class ArgvParser
     private int $limit = 6;
     private ?int $warnLimit = 4;
     private int $minClasses = 0;
-    private string $format = 'text';
+    private string $format = 'pretty';
     private string $colorMode = 'auto';
     private DiffAwareFlags $diffAware;
     private BoolFlags $bools;

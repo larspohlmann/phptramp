@@ -24,7 +24,7 @@ final class ArgvParserTest extends TestCase
         self::assertSame(6, $o->limit);
         self::assertSame(4, $o->warnLimit);
         self::assertSame(0, $o->minClasses);
-        self::assertSame('text', $o->format);
+        self::assertSame('pretty', $o->format);
         self::assertSame('auto', $o->colorMode);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
@@ -99,7 +99,7 @@ final class ArgvParserTest extends TestCase
      */
     public static function validFormatProvider(): iterable
     {
-        foreach (['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
+        foreach (['text', 'pretty', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
             yield $format => [$format];
         }
     }
