@@ -22,8 +22,9 @@ final class Options
     public function __construct(
         public readonly array $folders = [],
         public readonly array $files = [],
-        public readonly int $limit = 3,
-        public readonly ?int $warnLimit = null,
+        public readonly int $limit = 6,
+        public readonly ?int $warnLimit = 4,
+        public readonly int $minClasses = 0,
         public readonly string $format = 'text',
         public readonly bool $explain = false,
         public readonly bool $changedOnly = false,

@@ -39,7 +39,7 @@ final class ReporterFactoryTest extends TestCase
     public function testGithubFormatRoutesToGithubReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'github', limit: 2));
+        $reporter = $factory->create(new Options(format: 'github', limit: 2, warnLimit: 0));
 
         self::assertStringContainsString('::error', $reporter->render($this->qualifyingFinding()));
     }
@@ -47,7 +47,7 @@ final class ReporterFactoryTest extends TestCase
     public function testCheckstyleFormatRoutesToCheckstyleReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'checkstyle', limit: 2));
+        $reporter = $factory->create(new Options(format: 'checkstyle', limit: 2, warnLimit: 0));
 
         self::assertStringContainsString('<checkstyle', $reporter->render($this->qualifyingFinding()));
     }
@@ -55,7 +55,7 @@ final class ReporterFactoryTest extends TestCase
     public function testSarifFormatRoutesToSarifReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'sarif', limit: 2));
+        $reporter = $factory->create(new Options(format: 'sarif', limit: 2, warnLimit: 0));
 
         self::assertStringContainsString('"phptramp.trampData"', $reporter->render($this->qualifyingFinding()));
     }
@@ -63,7 +63,7 @@ final class ReporterFactoryTest extends TestCase
     public function testSummaryFormatRoutesToSummaryReporter(): void
     {
         $factory = new ReporterFactory('/not/matching');
-        $reporter = $factory->create(new Options(format: 'summary', limit: 2));
+        $reporter = $factory->create(new Options(format: 'summary', limit: 2, warnLimit: 0));
 
         self::assertStringContainsString('at or over the limit', $reporter->render($this->qualifyingFinding()));
     }

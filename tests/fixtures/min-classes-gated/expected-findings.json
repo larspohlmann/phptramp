@@ -1,0 +1,6 @@
+{
+    "limit": 3,
+    "warnLimit": null,
+    "minClasses": 5,
+    "findings": []
+}

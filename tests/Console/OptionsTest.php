@@ -15,8 +15,8 @@ final class OptionsTest extends TestCase
 
         self::assertSame([], $options->folders);
         self::assertSame([], $options->files);
-        self::assertSame(3, $options->limit);
-        self::assertNull($options->warnLimit);
+        self::assertSame(6, $options->limit);
+        self::assertSame(4, $options->warnLimit);
         self::assertSame('text', $options->format);
         self::assertFalse($options->explain);
         self::assertFalse($options->changedOnly);

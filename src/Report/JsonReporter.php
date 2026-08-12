@@ -32,6 +32,7 @@ final class JsonReporter implements Reporter
         $document = [
             'limit' => $this->thresholds->limit,
             'warnLimit' => $this->thresholds->warnLimit,
+            'minClasses' => $this->thresholds->minClasses,
             'findings' => $this->findingDocuments($findings),
         ];
 

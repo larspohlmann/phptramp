@@ -1,0 +1,25 @@
+{
+    "limit": 0,
+    "warnLimit": 4,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "warning",
+            "origin": "Demo\\Origin::run",
+            "terminal": "Demo\\Terminal::consume",
+            "terminalKind": "used",
+            "hops": 5,
+            "classes": 6,
+            "chain": [
+                {"method": "Demo\\Origin::run", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\Hop1::step", "role": "hop", "file": "src/Demo.php", "line": 19, "forwardLine": 21},
+                {"method": "Demo\\Hop2::step", "role": "hop", "file": "src/Demo.php", "line": 27, "forwardLine": 29},
+                {"method": "Demo\\Hop3::step", "role": "hop", "file": "src/Demo.php", "line": 35, "forwardLine": 37},
+                {"method": "Demo\\Hop4::step", "role": "hop", "file": "src/Demo.php", "line": 43, "forwardLine": 45},
+                {"method": "Demo\\Terminal::consume", "role": "terminal", "file": "src/Demo.php", "line": 51, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

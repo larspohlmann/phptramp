@@ -129,7 +129,7 @@ final class Application
     private function analyze(Options $options): int
     {
         try {
-            $thresholds = new Thresholds($options->limit, $options->warnLimit);
+            $thresholds = new Thresholds($options->limit, $options->warnLimit, $options->minClasses);
             $baselineFilter = new BaselineFilter();
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
@@ -380,8 +380,9 @@ final class Application
               --files <a,b,c>           Comma-separated list of files
 
             Reporting:
-              --limit <n>               Fail on chains with >= n pass-through hops (default: 3)
-              --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
+              --limit <n>               Fail on chains with >= n pass-through hops (default: 6)
+              --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops (default: 4; 0 = off)
+              --min-classes <n>         Only report chains traversing >= n distinct classes (default: 0 = off)
               --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
               --explain                 Show why chains ended (call resolution trace)
 
@@ -414,8 +415,9 @@ final class Application
             mode (--changed-only / --git-base / --diff), baselining
             (--generate-baseline / --baseline / --fail-on-stale),
             #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
-            config, --warn-limit, and a per-file index cache (--no-cache / the
-            `cache` config key) are all shipped. See docs/plan.md.
+            config, --warn-limit, --min-classes, and a per-file index cache
+            (--no-cache / the `cache` config key) are all shipped. See
+            docs/plan.md.
 
             TXT;
     }

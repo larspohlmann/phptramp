@@ -87,6 +87,7 @@ final class ConfigLoader
         $exclude = $defaults->exclude;
         $limit = $defaults->limit;
         $warnLimit = $defaults->warnLimit;
+        $minClasses = $defaults->minClasses;
         $format = $defaults->format;
         $baseline = $defaults->baseline;
         $cacheDir = $defaults->cacheDir;
@@ -97,6 +98,7 @@ final class ConfigLoader
                 'exclude' => $exclude = $this->requireStringList('exclude', $value),
                 'limit' => $limit = $this->requireInt('limit', $value),
                 'warnLimit' => $warnLimit = $this->requireInt('warnLimit', $value),
+                'minClasses' => $minClasses = $this->requireInt('minClasses', $value),
                 'format' => $format = $this->requireString('format', $value),
                 'baseline' => $baseline = $this->requireString('baseline', $value),
                 'cache' => $cacheDir = $this->requireString('cache', $value),
@@ -109,6 +111,7 @@ final class ConfigLoader
             files: $files,
             limit: $limit,
             warnLimit: $warnLimit,
+            minClasses: $minClasses,
             format: $format,
             baseline: $baseline,
             exclude: $exclude,

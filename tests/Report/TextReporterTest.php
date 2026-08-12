@@ -241,6 +241,41 @@ final class TextReporterTest extends TestCase
         self::assertStringNotContainsString('/tmp/project', $output);
     }
 
+    public function testFooterShowsMinClassesWhenSet(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\A::sink', 'Demo\A', 'src/A.php', 9, null),
+        ];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, 1, $chain, 1, [], []);
+
+        $expected = <<<'TXT'
+            FINDING  $p: 1 pass-through hop across 1 class
+              origin    Demo\A::go($p)    src/A.php:5
+              terminal  Demo\A::sink($p)  src/A.php:9  (used)
+
+            1 finding (limit: 1 hop, min-classes: 1 class).
+
+            TXT;
+
+        $reporter = new TextReporter(new Thresholds(1, null, 1), new Paths('/nonexistent-root'));
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
+    public function testFooterOmitsMinClassesWhenZero(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\A::sink', 'Demo\A', 'src/A.php', 9, null),
+        ];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, 1, $chain, 1, [], []);
+
+        $reporter = new TextReporter(new Thresholds(1, null, 0), new Paths('/nonexistent-root'));
+
+        self::assertStringNotContainsString('min-classes', $reporter->render([$finding]));
+    }
+
     public function testRendersMixedErrorAndWarningFindingsWithCombinedSummary(): void
     {
         $errorChain = [

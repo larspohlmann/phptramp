@@ -15,7 +15,7 @@ final class ReporterFactory
 
     public function create(Options $options): Reporter
     {
-        $thresholds = new Thresholds($options->limit, $options->warnLimit);
+        $thresholds = new Thresholds($options->limit, $options->warnLimit, $options->minClasses);
 
         return match ($options->format) {
             'text' => new TextReporter($thresholds, new Paths($this->workingDirectory), $options->explain),

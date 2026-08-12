@@ -166,7 +166,7 @@ final class FixtureTest extends TestCase
     {
         $argsFile = $caseDir . '/phptramp-args.json';
         if (! is_file($argsFile)) {
-            return ['--limit', '1'];
+            return ['--limit', '1', '--warn-limit', '0'];
         }
 
         $json = file_get_contents($argsFile);

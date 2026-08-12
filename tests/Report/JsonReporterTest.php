@@ -48,6 +48,7 @@ final class JsonReporterTest extends TestCase
             {
                 "limit": 3,
                 "warnLimit": 2,
+                "minClasses": 0,
                 "findings": [
                     {
                         "param": "config",
@@ -123,6 +124,7 @@ final class JsonReporterTest extends TestCase
             {
                 "limit": 3,
                 "warnLimit": 2,
+                "minClasses": 0,
                 "findings": [
                     {
                         "param": "config",
@@ -228,6 +230,7 @@ final class JsonReporterTest extends TestCase
             {
                 "limit": 3,
                 "warnLimit": 2,
+                "minClasses": 0,
                 "findings": [
                     {
                         "param": "p",
@@ -292,6 +295,7 @@ final class JsonReporterTest extends TestCase
             {
                 "limit": 1,
                 "warnLimit": null,
+                "minClasses": 0,
                 "findings": [
                     {
                         "param": "p",
@@ -377,6 +381,7 @@ final class JsonReporterTest extends TestCase
             {
                 "limit": 2,
                 "warnLimit": null,
+                "minClasses": 0,
                 "findings": [
                     {
                         "param": "cfg",
@@ -422,6 +427,7 @@ final class JsonReporterTest extends TestCase
             {
                 "limit": 3,
                 "warnLimit": null,
+                "minClasses": 0,
                 "findings": []
             }
 
@@ -430,5 +436,28 @@ final class JsonReporterTest extends TestCase
         $reporter = new JsonReporter(new Thresholds(3, null), $this->paths());
 
         self::assertSame($expected, $reporter->render([]));
+    }
+
+    public function testMinClassesIsEmittedWhenSet(): void
+    {
+        $chain = [
+            new Hop('Demo\A::go', 'Demo\A', 'src/A.php', 5, 7),
+            new Hop('Demo\A::sink', 'Demo\A', 'src/A.php', 9, null),
+        ];
+        $finding = new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, 1, $chain, 1, [], []);
+
+        $expected = <<<'JSON'
+            {
+                "limit": 1,
+                "warnLimit": null,
+                "minClasses": 2,
+                "findings": []
+            }
+
+            JSON;
+
+        $reporter = new JsonReporter(new Thresholds(1, null, 2), $this->paths());
+
+        self::assertSame($expected, $reporter->render([$finding]));
     }
 }

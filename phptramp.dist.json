@@ -1,5 +1,5 @@
 {
     "paths": ["src"],
-    "limit": 3,
-    "warnLimit": 2
+    "limit": 6,
+    "warnLimit": 4
 }

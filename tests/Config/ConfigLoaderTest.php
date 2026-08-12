@@ -221,4 +221,22 @@ final class ConfigLoaderTest extends TestCase
 
         (new ConfigLoader())->load($this->directory);
     }
+
+    public function testMinClassesIsMapped(): void
+    {
+        $this->writeConfig('phptramp.json', '{"minClasses": 5}');
+
+        $options = (new ConfigLoader())->load($this->directory);
+
+        self::assertSame(5, $options->minClasses);
+    }
+
+    public function testWrongTypeForMinClassesThrows(): void
+    {
+        $this->writeConfig('phptramp.json', '{"minClasses": "three"}');
+
+        $this->expectException(ConfigException::class);
+
+        (new ConfigLoader())->load($this->directory);
+    }
 }

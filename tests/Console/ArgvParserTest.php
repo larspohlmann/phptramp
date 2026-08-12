@@ -21,8 +21,9 @@ final class ArgvParserTest extends TestCase
         $o = $this->parse();
         self::assertSame([], $o->folders);
         self::assertSame([], $o->files);
-        self::assertSame(3, $o->limit);
-        self::assertNull($o->warnLimit);
+        self::assertSame(6, $o->limit);
+        self::assertSame(4, $o->warnLimit);
+        self::assertSame(0, $o->minClasses);
         self::assertSame('text', $o->format);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
@@ -297,6 +298,27 @@ final class ArgvParserTest extends TestCase
         $defaults = new Options(exclude: ['vendor/*']);
 
         self::assertSame(['vendor/*'], (new ArgvParser())->parse([], $defaults)->exclude);
+    }
+
+    public function testMinClassesParsed(): void
+    {
+        self::assertSame(4, $this->parse('--min-classes', '4')->minClasses);
+    }
+
+    public function testMinClassesEqualsSyntaxWorks(): void
+    {
+        self::assertSame(3, $this->parse('--min-classes=3')->minClasses);
+    }
+
+    public function testMinClassesDefaultsToZero(): void
+    {
+        self::assertSame(0, $this->parse()->minClasses);
+    }
+
+    public function testNonNumericMinClassesThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--min-classes', 'x');
     }
 
     public function testSeededNonPathDefaultsSurviveAlongsideExplicitFlags(): void
