@@ -24,6 +24,7 @@ final class ArgvParser
         '--files',
         '--limit',
         '--warn-limit',
+        '--min-classes',
         '--format',
         '--git-base',
         '--diff',
@@ -52,6 +53,7 @@ final class ArgvParser
     private array $files = [];
     private int $limit = 3;
     private ?int $warnLimit = null;
+    private int $minClasses = 0;
     private string $format = 'text';
     private DiffAwareFlags $diffAware;
     private BoolFlags $bools;
@@ -80,6 +82,7 @@ final class ArgvParser
             files: $this->files,
             limit: $this->limit,
             warnLimit: $this->warnLimit,
+            minClasses: $this->minClasses,
             format: $this->format,
             explain: $this->bools->explain,
             changedOnly: $this->diffAware->changedOnly,
@@ -104,6 +107,7 @@ final class ArgvParser
         $this->files = $defaults->files;
         $this->limit = $defaults->limit;
         $this->warnLimit = $defaults->warnLimit;
+        $this->minClasses = $defaults->minClasses;
         $this->format = $defaults->format;
         $this->diffAware = new DiffAwareFlags($defaults->changedOnly, $defaults->gitBase, $defaults->diff);
         $this->bools = new BoolFlags(
@@ -163,6 +167,7 @@ final class ArgvParser
             '--files' => $this->appendFiles($value),
             '--limit' => $this->limit = $this->toInt($name, $value),
             '--warn-limit' => $this->warnLimit = $this->toInt($name, $value),
+            '--min-classes' => $this->minClasses = $this->toInt($name, $value),
             '--format' => $this->format = $this->validateFormat($value),
             '--git-base' => $this->diffAware->gitBase = $value,
             '--diff' => $this->applyDiffFlag($value),

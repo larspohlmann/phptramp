@@ -299,6 +299,27 @@ final class ArgvParserTest extends TestCase
         self::assertSame(['vendor/*'], (new ArgvParser())->parse([], $defaults)->exclude);
     }
 
+    public function testMinClassesParsed(): void
+    {
+        self::assertSame(4, $this->parse('--min-classes', '4')->minClasses);
+    }
+
+    public function testMinClassesEqualsSyntaxWorks(): void
+    {
+        self::assertSame(3, $this->parse('--min-classes=3')->minClasses);
+    }
+
+    public function testMinClassesDefaultsToZero(): void
+    {
+        self::assertSame(0, $this->parse()->minClasses);
+    }
+
+    public function testNonNumericMinClassesThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--min-classes', 'x');
+    }
+
     public function testSeededNonPathDefaultsSurviveAlongsideExplicitFlags(): void
     {
         $defaults = new Options(format: 'json', gitBase: 'develop');
