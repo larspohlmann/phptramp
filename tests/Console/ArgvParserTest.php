@@ -21,8 +21,9 @@ final class ArgvParserTest extends TestCase
         $o = $this->parse();
         self::assertSame([], $o->folders);
         self::assertSame([], $o->files);
-        self::assertSame(3, $o->limit);
-        self::assertNull($o->warnLimit);
+        self::assertSame(6, $o->limit);
+        self::assertSame(4, $o->warnLimit);
+        self::assertSame(0, $o->minClasses);
         self::assertSame('text', $o->format);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);

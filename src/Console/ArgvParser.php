@@ -51,8 +51,8 @@ final class ArgvParser
     private array $folders = [];
     /** @var list<string> */
     private array $files = [];
-    private int $limit = 3;
-    private ?int $warnLimit = null;
+    private int $limit = 6;
+    private ?int $warnLimit = 4;
     private int $minClasses = 0;
     private string $format = 'text';
     private DiffAwareFlags $diffAware;

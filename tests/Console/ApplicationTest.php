@@ -113,7 +113,7 @@ final class ApplicationTest extends TestCase
         mkdir($directory);
         $this->folders[] = $directory;
 
-        file_put_contents($directory . '/phptramp.json', '{"paths": ["."], "limit": 1}');
+        file_put_contents($directory . '/phptramp.json', '{"paths": ["."], "limit": 1, "warnLimit": 0}');
 
         $code = '<?php namespace Demo; class Cfg {} '
             . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
@@ -140,7 +140,9 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--no-config']));
+        self::assertSame(1, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '0',
+        ]));
         self::assertStringContainsString('FINDING', self::contents($this->stdout));
     }
 
@@ -148,7 +150,9 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(0, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--limit', '4']));
+        self::assertSame(0, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '4', '--warn-limit', '0',
+        ]));
         self::assertStringContainsString('No tramp data found', self::contents($this->stdout));
     }
 
@@ -156,7 +160,10 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(2, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--format', 'xml']));
+        self::assertSame(2, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '0',
+            '--format', 'xml',
+        ]));
         self::assertStringContainsString('unknown format: xml', self::contents($this->stderr));
         self::assertSame('', self::contents($this->stdout));
     }
@@ -165,7 +172,10 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--format', 'summary']));
+        self::assertSame(1, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '0',
+            '--format', 'summary',
+        ]));
         self::assertStringContainsString('at or over the limit', self::contents($this->stdout));
     }
 
@@ -173,7 +183,10 @@ final class ApplicationTest extends TestCase
     {
         $folder = $this->fixtureWithThreeHopChain();
 
-        self::assertSame(1, $this->app->run(['phptramp', '--folder', $folder, '--no-config', '--format', 'json']));
+        self::assertSame(1, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '0',
+            '--format', 'json',
+        ]));
 
         $output = self::contents($this->stdout);
         self::assertStringContainsString('"findings"', $output);
@@ -219,7 +232,7 @@ final class ApplicationTest extends TestCase
         mkdir($directory);
         $this->folders[] = $directory;
 
-        file_put_contents($directory . '/phptramp.json', '{"limit": 1}');
+        file_put_contents($directory . '/phptramp.json', '{"limit": 1, "warnLimit": 0}');
 
         $code = '<?php namespace Demo; class Cfg {} '
             . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
@@ -258,7 +271,9 @@ final class ApplicationTest extends TestCase
 
         try {
             chdir($directory);
-            $exitCode = $this->app->run(['phptramp', '--folder', $directory, '--no-config']);
+            $exitCode = $this->app->run([
+                'phptramp', '--folder', $directory, '--no-config', '--limit', '3', '--warn-limit', '0',
+            ]);
         } finally {
             chdir($previousCwd);
         }
@@ -274,6 +289,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runInFolder($folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', $diffFile,
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(1, $exitCode);
@@ -287,6 +303,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runInFolder($folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', $diffFile,
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(0, $exitCode);
@@ -301,6 +318,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runAppInFolder($app, $folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', '-',
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(1, $exitCode);
@@ -314,6 +332,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runInFolder($folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', $missingDiffFile,
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(2, $exitCode);
@@ -327,6 +346,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runInFolder($folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', $diffFile,
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(2, $exitCode);
@@ -340,6 +360,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runInFolder($folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', $diffFile,
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(0, $exitCode);
@@ -354,6 +375,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->runAppInFolder($app, $folder, [
             'phptramp', '--folder', $folder, '--changed-only', '--diff', '-',
+            '--limit', '3', '--warn-limit', '0',
         ]);
 
         self::assertSame(0, $exitCode);
@@ -366,7 +388,9 @@ final class ApplicationTest extends TestCase
         $baselineFile = $folder . '/baseline.json';
 
         $exitCode = $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--generate-baseline', $baselineFile,
         ]);
 
         self::assertSame(0, $exitCode);
@@ -401,7 +425,9 @@ final class ApplicationTest extends TestCase
         $folder = $this->fixtureWithThreeHopChain();
 
         $exitCode = $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $folder,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--generate-baseline', $folder,
         ]);
 
         self::assertSame(2, $exitCode);
@@ -419,6 +445,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->app->run([
             'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
             '--baseline', $folder . '/old-baseline.json',
             '--generate-baseline', $baselineFile,
         ]);
@@ -437,14 +464,18 @@ final class ApplicationTest extends TestCase
         $baselineFile = $folder . '/baseline.json';
 
         $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--generate-baseline', $baselineFile,
         ]);
 
         [$stdout, $stderr] = $this->freshStreams();
         $consume = new Application($stdout, $stderr);
 
         $exitCode = $consume->run([
-            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--baseline', $baselineFile,
         ]);
 
         self::assertSame(0, $exitCode);
@@ -457,7 +488,9 @@ final class ApplicationTest extends TestCase
         $baselineFile = $folder . '/baseline.json';
 
         $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--generate-baseline', $baselineFile,
         ]);
 
         file_put_contents($folder . '/NewDemo.php', $this->newThreeHopChainCode());
@@ -466,7 +499,9 @@ final class ApplicationTest extends TestCase
         $consume = new Application($stdout, $stderr);
 
         $exitCode = $consume->run([
-            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--baseline', $baselineFile,
         ]);
 
         self::assertSame(1, $exitCode);
@@ -482,7 +517,9 @@ final class ApplicationTest extends TestCase
         file_put_contents($baselineFile, '{"fingerprint": []}');
 
         $exitCode = $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--baseline', $baselineFile,
         ]);
 
         self::assertSame(2, $exitCode);
@@ -496,7 +533,9 @@ final class ApplicationTest extends TestCase
         $missingBaselineFile = $folder . '/does-not-exist.json';
 
         $exitCode = $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--baseline', $missingBaselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--baseline', $missingBaselineFile,
         ]);
 
         self::assertSame(2, $exitCode);
@@ -521,10 +560,11 @@ final class ApplicationTest extends TestCase
         $generate = new Application($genStdout, $genStderr);
         $generate->run([
             'phptramp', '--folder', $directory, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
             '--generate-baseline', $directory . '/baseline.json',
         ]);
 
-        file_put_contents($directory . '/phptramp.json', '{"baseline": "baseline.json"}');
+        file_put_contents($directory . '/phptramp.json', '{"baseline": "baseline.json", "limit": 3, "warnLimit": 0}');
 
         [$stdout, $stderr] = $this->freshStreams();
         $consume = new Application($stdout, $stderr);
@@ -548,7 +588,9 @@ final class ApplicationTest extends TestCase
         $baselineFile = $this->baselineWithOneRealAndOneFabricatedEntry($folder);
 
         $exitCode = $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--baseline', $baselineFile,
         ]);
 
         self::assertSame(0, $exitCode);
@@ -567,6 +609,7 @@ final class ApplicationTest extends TestCase
 
         $exitCode = $this->app->run([
             'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
             '--baseline', $baselineFile, '--fail-on-stale',
         ]);
 
@@ -578,7 +621,7 @@ final class ApplicationTest extends TestCase
         $folder = $this->fixtureWithChainAndUnusedIgnore();
 
         $exitCode = $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--limit', '3',
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '0',
         ]);
 
         // The real chain is reported at limit 3, so the base exit is 1; the
@@ -600,7 +643,7 @@ final class ApplicationTest extends TestCase
         $diffFile = $this->writeDiffFile($folder, 'empty.diff', '');
 
         $exitCode = $this->runInFolder($folder, [
-            'phptramp', '--folder', $folder, '--no-config', '--limit', '3',
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '3', '--warn-limit', '0',
             '--changed-only', '--diff', $diffFile, '--fail-on-stale',
         ]);
 
@@ -661,6 +704,7 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(1, $this->app->run([
             'phptramp', '--folder', $folder, '--no-config', '--no-cache',
+            '--limit', '3', '--warn-limit', '0',
         ]));
         self::assertDirectoryDoesNotExist($cacheDir);
     }
@@ -700,7 +744,7 @@ final class ApplicationTest extends TestCase
         file_put_contents($cwd . '/Demo.php', $sourceCode);
         file_put_contents(
             $cwd . '/phptramp.json',
-            '{"paths": ["."], "cache": ' . json_encode($cacheDir) . '}',
+            '{"paths": ["."], "limit": 3, "warnLimit": 0, "cache": ' . json_encode($cacheDir) . '}',
         );
 
         return [$cwd, $cacheDir];
@@ -980,7 +1024,9 @@ final class ApplicationTest extends TestCase
         $baselineFile = $folder . '/baseline.json';
 
         $this->app->run([
-            'phptramp', '--folder', $folder, '--no-config', '--generate-baseline', $baselineFile,
+            'phptramp', '--folder', $folder, '--no-config',
+            '--limit', '3', '--warn-limit', '0',
+            '--generate-baseline', $baselineFile,
         ]);
 
         $document = json_decode((string) file_get_contents($baselineFile), true);

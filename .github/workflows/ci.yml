@@ -38,7 +38,7 @@ jobs:
         run: composer stan
       - name: PHPMD (codesize)
         run: composer md
-      # Dogfood: phptramp gates itself via its own config (limit 3, warn-limit 2).
+      # Dogfood: phptramp gates itself via its own config (limit 6, warn-limit 4).
       - name: Dogfood
         run: composer tramp
 
