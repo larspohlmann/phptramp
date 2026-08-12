@@ -129,7 +129,7 @@ final class Application
     private function analyze(Options $options): int
     {
         try {
-            $thresholds = new Thresholds($options->limit, $options->warnLimit);
+            $thresholds = new Thresholds($options->limit, $options->warnLimit, $options->minClasses);
             $baselineFilter = new BaselineFilter();
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);

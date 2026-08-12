@@ -1,6 +1,7 @@
 {
     "limit": 1,
     "warnLimit": null,
+    "minClasses": 0,
     "findings": [
         {
             "param": "config",
