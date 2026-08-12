@@ -15,21 +15,15 @@ use PhpTramp\Chain\TerminalKind;
  * Color is the injected Styler's concern; this class never branches on whether
  * color is on.
  *
- * The class mirrors TextReporter's per-finding text logic and layers
- * file-grouping, styling, and a divergent severity model (it reports
- * below-limit findings when no warn tier is configured) on top. That is what
- * pushes the cyclomatic complexity past the codesize threshold. The proper fix
- * — extracting the shared per-finding rendering with TextReporter — is a
- * planned separate refactor and is out of scope for the pretty-format task, so
- * the complexity is suppressed here rather than papered over with a premature
- * extraction that would split the duplicated logic across two files.
- *
- * @SuppressWarnings("ExcessiveClassComplexity")
+ * Per-finding text, threshold filtering, terminal detection, and the summary
+ * shape mirror TextReporter exactly; this layers file-grouping, styling, and
+ * the divider on top.
  */
 final class PrettyReporter implements Reporter
 {
     private const INDENT = '  ';
     private const COLUMN_GAP = '  ';
+    private const MIN_LABEL_WIDTH = 8;
     private const DIVIDER_WIDTH = 64;
 
     private readonly Pluralizer $pluralizer;
@@ -59,11 +53,8 @@ final class PrettyReporter implements Reporter
     }
 
     /**
-     * A finding is reportable when it clears the min-classes filter and, when a
-     * warn tier is configured, reaches at least the warn threshold. Without a
-     * warn tier every finding is reported as an error — the "pretty" format is
-     * for eyeballing tramp data, so suppression belongs to the CLI/CI gate, not
-     * the renderer.
+     * A finding is reportable when it clears the threshold tiers — same filter
+     * as TextReporter (delegated to Thresholds::severityOf).
      *
      * @param list<Finding> $findings
      * @return list<array{0: Finding, 1: Severity}>
@@ -72,26 +63,13 @@ final class PrettyReporter implements Reporter
     {
         $reportable = [];
         foreach ($findings as $finding) {
-            $severity = $this->severityOf($finding);
+            $severity = $this->thresholds->severityOf($finding);
             if ($severity !== null) {
                 $reportable[] = [$finding, $severity];
             }
         }
 
         return $reportable;
-    }
-
-    private function severityOf(Finding $finding): ?Severity
-    {
-        $inherent = $this->thresholds->severityOf($finding);
-        if ($inherent !== null) {
-            return $inherent;
-        }
-
-        // Below every threshold: suppressed when a warn tier exists, reported
-        // as an error otherwise — the "pretty" view is for eyeballing tramp
-        // data, so without a warn tier nothing is hidden from the reader.
-        return $this->thresholds->warnLimit === null ? Severity::Error : null;
     }
 
     /**
@@ -196,34 +174,25 @@ final class PrettyReporter implements Reporter
     }
 
     /**
-     * @return list<array{label: string, method: string, location: string, annotation: string}>
+     * @return list<array{label: string, fqmn: string, param: string, location: string, annotation: string}>
      */
     private function hopRows(Finding $finding): array
     {
-        $hasTerminalNode = $this->hasKeptTerminal($finding->terminalKind);
-        $terminalIndex = count($finding->chain) - 1;
+        $hasTerminalNode = count($finding->chain) > $finding->hops;
 
         $rows = [];
         foreach ($finding->chain as $index => $hop) {
-            $isTerminal = $hasTerminalNode && $index === $terminalIndex;
+            $isTerminal = $hasTerminalNode && $index === $finding->hops;
             $rows[] = [
                 'label' => $this->label($index, $isTerminal),
-                'method' => $hop->fqmn . '($' . $finding->param . ')',
+                'fqmn' => $hop->fqmn,
+                'param' => $finding->param,
                 'location' => $this->location($hop),
                 'annotation' => $this->annotation($hop, $finding->terminalKind, $isTerminal),
             ];
         }
 
         return $rows;
-    }
-
-    /**
-     * The kept terminal kinds (used/stored/&-terminated/unused-end) carry the
-     * terminal node as the last chain element; external/truncated do not.
-     */
-    private function hasKeptTerminal(TerminalKind $terminalKind): bool
-    {
-        return ! in_array($terminalKind, [TerminalKind::Truncated, TerminalKind::External], true);
     }
 
     private function annotation(Hop $hop, TerminalKind $terminalKind, bool $isTerminal): string
@@ -256,15 +225,14 @@ final class PrettyReporter implements Reporter
     }
 
     /**
-     * @param array{label: string, method: string, location: string, annotation: string} $row
+     * @param array{label: string, fqmn: string, param: string, location: string, annotation: string} $row
      */
     private function hopLine(array $row, int $labelWidth, int $methodWidth): string
     {
-        [$fqmn, $paramName] = $this->splitMethod($row['method']);
-        $paramFragment = '($' . $this->styler->paramInMethod($paramName) . ')';
-        $paramVisibleWidth = strlen('($' . $paramName . ')');
-        $fqmnPadding = max(0, $methodWidth - $paramVisibleWidth - strlen($fqmn));
-        $rest = $fqmn . $paramFragment . str_repeat(' ', $fqmnPadding)
+        $paramFragment = '($' . $this->styler->paramInMethod($row['param']) . ')';
+        $paramVisibleWidth = strlen('($' . $row['param'] . ')');
+        $fqmnPadding = max(0, $methodWidth - $paramVisibleWidth - strlen($row['fqmn']));
+        $rest = $row['fqmn'] . $paramFragment . str_repeat(' ', $fqmnPadding)
             . self::COLUMN_GAP . $this->styler->location($row['location']);
         if ($row['annotation'] !== '') {
             $styledAnnotation = str_starts_with($row['annotation'], '(')
@@ -276,17 +244,6 @@ final class PrettyReporter implements Reporter
         return $this->labelledLine($row['label'], $labelWidth, $rest);
     }
 
-    /** @return array{0: string, 1: string} */
-    private function splitMethod(string $method): array
-    {
-        $paren = strpos($method, '($');
-        if ($paren === false) {
-            return [$method, ''];
-        }
-
-        return [substr($method, 0, $paren), substr($method, $paren + 2, -1)];
-    }
-
     private function labelledLine(string $label, int $labelWidth, string $rest): string
     {
         $paddedLabel = str_pad($label, $labelWidth);
@@ -295,12 +252,12 @@ final class PrettyReporter implements Reporter
     }
 
     /**
-     * @param list<array{label: string, method: string, location: string, annotation: string}> $rows
+     * @param list<array{label: string, fqmn: string, param: string, location: string, annotation: string}> $rows
      * @param list<string> $notes
      */
     private function labelWidth(array $rows, array $notes): int
     {
-        $widths = [];
+        $widths = [self::MIN_LABEL_WIDTH];
         foreach ($rows as $row) {
             $widths[] = strlen($row['label']);
         }
@@ -308,17 +265,17 @@ final class PrettyReporter implements Reporter
             $widths[] = strlen('note');
         }
 
-        return $widths === [] ? 0 : max($widths);
+        return max($widths);
     }
 
     /**
-     * @param list<array{label: string, method: string, location: string, annotation: string}> $rows
+     * @param list<array{label: string, fqmn: string, param: string, location: string, annotation: string}> $rows
      */
     private function methodWidth(array $rows): int
     {
         $widths = [0];
         foreach ($rows as $row) {
-            $widths[] = strlen($row['method']);
+            $widths[] = strlen($row['fqmn'] . '($' . $row['param'] . ')');
         }
 
         return max($widths);
@@ -341,30 +298,28 @@ final class PrettyReporter implements Reporter
     }
 
     /**
-     * The error/warning breakdown is shown only when a warn tier is configured
-     * and the report actually mixes errors and warnings — a single-tier report
-     * (or a pure-error/pure-warning one) reads cleaner as a plain count.
+     * Mirrors TextReporter::summary: when a warn tier is configured, show the
+     * error/warning breakdown; otherwise a plain count.
      *
      * @param list<array{0: Finding, 1: Severity}> $reportable
      */
     private function summary(array $reportable): string
     {
         $count = count($reportable);
-        $errorCount = count(array_filter($reportable, static fn (array $entry): bool => $entry[1] === Severity::Error));
-        $warningCount = $count - $errorCount;
-        $showsSplit = $this->thresholds->warnLimit !== null && $errorCount > 0 && $warningCount > 0;
-
-        if ($showsSplit) {
+        if ($this->thresholds->warnLimit === null) {
             return $this->styler->summary(
-                $count . ' ' . $this->pluralizer->of($count, 'finding') . ' ('
-                . $errorCount . ' ' . $this->pluralizer->of($errorCount, 'error') . ', '
-                . $warningCount . ' ' . $this->pluralizer->of($warningCount, 'warning') . '; '
-                . $this->limitClause() . ').'
+                $count . ' ' . $this->pluralizer->of($count, 'finding') . ' (' . $this->limitClause() . ').',
             );
         }
 
+        $errorCount = count(array_filter($reportable, static fn (array $entry): bool => $entry[1] === Severity::Error));
+        $warningCount = $count - $errorCount;
+
         return $this->styler->summary(
-            $count . ' ' . $this->pluralizer->of($count, 'finding') . ' (' . $this->limitClause() . ').'
+            $count . ' ' . $this->pluralizer->of($count, 'finding') . ' ('
+            . $errorCount . ' ' . $this->pluralizer->of($errorCount, 'error') . ', '
+            . $warningCount . ' ' . $this->pluralizer->of($warningCount, 'warning') . '; '
+            . $this->limitClause() . ').',
         );
     }
 
