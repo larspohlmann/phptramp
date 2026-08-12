@@ -62,8 +62,84 @@ final class ThresholdsTest extends TestCase
         new Thresholds(2, 3);
     }
 
+    public function testMinClassesGatesBothTiersWhenClassesBelowMinimum(): void
+    {
+        $thresholds = new Thresholds(3, 2, minClasses: 5);
+
+        self::assertNull($thresholds->severityOf($this->findingWithHopsAndClasses(5, 4)));
+    }
+
+    public function testMinClassesBoundaryReportsAtExactlyMinClasses(): void
+    {
+        $thresholds = new Thresholds(3, 2, minClasses: 4);
+
+        self::assertSame(Severity::Error, $thresholds->severityOf($this->findingWithHopsAndClasses(3, 4)));
+    }
+
+    public function testMinClassesZeroIsOffAndReportsNormally(): void
+    {
+        $thresholds = new Thresholds(3, null, minClasses: 0);
+
+        self::assertSame(Severity::Error, $thresholds->severityOf($this->findingWithHopsAndClasses(3, 1)));
+    }
+
+    public function testLimitZeroDisablesErrorTierButWarnTierStillFires(): void
+    {
+        $thresholds = new Thresholds(0, 4);
+
+        self::assertSame(Severity::Warning, $thresholds->severityOf($this->findingWithHopsAndClasses(5, 1)));
+    }
+
+    public function testLimitZeroDisablesErrorTierAndExitCodeStaysZero(): void
+    {
+        $thresholds = new Thresholds(0, null);
+
+        self::assertNull($thresholds->severityOf($this->findingWithHopsAndClasses(99, 1)));
+    }
+
+    public function testWarnLimitZeroIsNormalizedToNullAndDisablesWarnTier(): void
+    {
+        $thresholds = new Thresholds(6, 0);
+
+        self::assertNull($thresholds->warnLimit);
+        self::assertNull($thresholds->severityOf($this->findingWithHopsAndClasses(4, 1)));
+    }
+
+    public function testGuardAllowsLimitZeroWithPositiveWarnLimit(): void
+    {
+        new Thresholds(0, 4);
+
+        $this->expectNotToPerformAssertions();
+    }
+
+    public function testGuardAllowsWarnLimitZeroWithPositiveLimit(): void
+    {
+        new Thresholds(6, 0);
+
+        $this->expectNotToPerformAssertions();
+    }
+
+    public function testGuardStillThrowsWhenBothPositiveAndWarnLimitAtLimit(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+
+        new Thresholds(6, 6);
+    }
+
+    public function testGuardStillThrowsWhenBothPositiveAndWarnLimitAboveLimit(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+
+        new Thresholds(3, 5);
+    }
+
     private function findingWithHops(int $hops): Finding
     {
         return new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, $hops, [], 1, [], []);
+    }
+
+    private function findingWithHopsAndClasses(int $hops, int $classes): Finding
+    {
+        return new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, $hops, [], $classes, [], []);
     }
 }
