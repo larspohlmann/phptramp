@@ -18,6 +18,7 @@ final class OptionsTest extends TestCase
         self::assertSame(6, $options->limit);
         self::assertSame(4, $options->warnLimit);
         self::assertSame('text', $options->format);
+        self::assertSame('auto', $options->colorMode);
         self::assertFalse($options->explain);
         self::assertFalse($options->changedOnly);
         self::assertSame('origin/main', $options->gitBase);

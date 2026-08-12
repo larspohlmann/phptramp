@@ -26,6 +26,7 @@ final class ArgvParser
         '--warn-limit',
         '--min-classes',
         '--format',
+        '--color',
         '--git-base',
         '--diff',
         '--baseline',
@@ -46,6 +47,7 @@ final class ArgvParser
     ];
 
     private const VALID_FORMATS = ['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'];
+    private const VALID_COLOR_MODES = ['always', 'auto', 'never'];
 
     /** @var list<string> */
     private array $folders = [];
@@ -55,6 +57,7 @@ final class ArgvParser
     private ?int $warnLimit = 4;
     private int $minClasses = 0;
     private string $format = 'text';
+    private string $colorMode = 'auto';
     private DiffAwareFlags $diffAware;
     private BoolFlags $bools;
     private ?string $baseline = null;
@@ -84,6 +87,7 @@ final class ArgvParser
             warnLimit: $this->warnLimit,
             minClasses: $this->minClasses,
             format: $this->format,
+            colorMode: $this->colorMode,
             explain: $this->bools->explain,
             changedOnly: $this->diffAware->changedOnly,
             gitBase: $this->diffAware->gitBase,
@@ -109,6 +113,7 @@ final class ArgvParser
         $this->warnLimit = $defaults->warnLimit;
         $this->minClasses = $defaults->minClasses;
         $this->format = $defaults->format;
+        $this->colorMode = $defaults->colorMode;
         $this->diffAware = new DiffAwareFlags($defaults->changedOnly, $defaults->gitBase, $defaults->diff);
         $this->bools = new BoolFlags(
             explain: $defaults->explain,
@@ -169,6 +174,7 @@ final class ArgvParser
             '--warn-limit' => $this->warnLimit = $this->toInt($name, $value),
             '--min-classes' => $this->minClasses = $this->toInt($name, $value),
             '--format' => $this->format = $this->validateFormat($value),
+            '--color' => $this->colorMode = $this->validateColorMode($value),
             '--git-base' => $this->diffAware->gitBase = $value,
             '--diff' => $this->applyDiffFlag($value),
             '--baseline' => $this->baseline = $value,
@@ -251,6 +257,17 @@ final class ArgvParser
         if (! in_array($value, self::VALID_FORMATS, true)) {
             throw new InvalidArgsException(
                 "unknown format: {$value} (expected " . implode('|', self::VALID_FORMATS) . ')'
+            );
+        }
+
+        return $value;
+    }
+
+    private function validateColorMode(string $value): string
+    {
+        if (! in_array($value, self::VALID_COLOR_MODES, true)) {
+            throw new InvalidArgsException(
+                "unknown color mode: {$value} (expected " . implode('|', self::VALID_COLOR_MODES) . ')'
             );
         }
 

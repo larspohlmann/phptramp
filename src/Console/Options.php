@@ -26,6 +26,7 @@ final class Options
         public readonly ?int $warnLimit = 4,
         public readonly int $minClasses = 0,
         public readonly string $format = 'text',
+        public readonly string $colorMode = 'auto',
         public readonly bool $explain = false,
         public readonly bool $changedOnly = false,
         public readonly string $gitBase = 'origin/main',
