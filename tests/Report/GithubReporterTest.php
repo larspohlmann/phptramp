@@ -43,11 +43,11 @@ final class GithubReporterTest extends TestCase
             [],
         );
 
-        $expected = "::error file=src/Demo.php,line=12,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
+        $expected = "::error file=src/Demo.php,line=14,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
             . "across 4 classes (terminal%3A Demo\\Mailer%3A%3A__construct [stored])\n"
-            . "::notice file=src/Demo.php,line=18,title=phptramp%3A%3Ahop 2 of \$config chain from "
+            . "::notice file=src/Demo.php,line=20,title=phptramp%3A%3Ahop 2 of \$config chain from "
             . "Demo\\Controller%3A%3Ahandle\n"
-            . "::notice file=src/Demo.php,line=24,title=phptramp%3A%3Ahop 3 of \$config chain from "
+            . "::notice file=src/Demo.php,line=26,title=phptramp%3A%3Ahop 3 of \$config chain from "
             . "Demo\\Controller%3A%3Ahandle\n";
 
         $reporter = new GithubReporter(new Thresholds(3, null), $this->paths());
@@ -75,12 +75,12 @@ final class GithubReporterTest extends TestCase
             [],
         );
 
-        $expected = "::error file=src/Demo.php,line=18,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
+        $expected = "::error file=src/Demo.php,line=20,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
             . "across 4 classes (terminal%3A Demo\\Mailer%3A%3A__construct [stored]) (hop 2 of the chain%2C "
             . "changed by this diff)\n"
-            . "::notice file=src/Demo.php,line=12,title=phptramp%3A%3Ahop 1 of \$config chain from "
+            . "::notice file=src/Demo.php,line=14,title=phptramp%3A%3Ahop 1 of \$config chain from "
             . "Demo\\Controller%3A%3Ahandle\n"
-            . "::notice file=src/Demo.php,line=24,title=phptramp%3A%3Ahop 3 of \$config chain from "
+            . "::notice file=src/Demo.php,line=26,title=phptramp%3A%3Ahop 3 of \$config chain from "
             . "Demo\\Controller%3A%3Ahandle\n";
 
         $reporter = new GithubReporter(new Thresholds(3, null), $this->paths());
@@ -96,7 +96,7 @@ final class GithubReporterTest extends TestCase
         ];
         $finding = new Finding('p', 'Demo\A::go', 'Demo\A::sink', TerminalKind::Used, 1, $chain, 1, [], []);
 
-        $expected = "::warning file=src/A.php,line=5,title=phptramp%3A%3A\$p%3A 1 pass-through hop across 1 class "
+        $expected = "::warning file=src/A.php,line=7,title=phptramp%3A%3A\$p%3A 1 pass-through hop across 1 class "
             . "(terminal%3A Demo\\A%3A%3Asink [used])\n";
 
         $reporter = new GithubReporter(new Thresholds(3, 1), $this->paths());
@@ -204,11 +204,11 @@ final class GithubReporterTest extends TestCase
             [],
         );
 
-        $expected = "::error file=src/Demo.php,line=12,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
+        $expected = "::error file=src/Demo.php,line=14,title=phptramp%3A%3A\$config%3A 3 pass-through hops "
             . "across 4 classes (terminal%3A Demo\\Mailer%3A%3A__construct [stored])\n"
-            . "::notice file=src/Demo.php,line=18,title=phptramp%3A%3Ahop 2 of \$config chain from "
+            . "::notice file=src/Demo.php,line=20,title=phptramp%3A%3Ahop 2 of \$config chain from "
             . "Demo\\Controller%3A%3Ahandle\n"
-            . "::notice file=src/Demo.php,line=24,title=phptramp%3A%3Ahop 3 of \$config chain from "
+            . "::notice file=src/Demo.php,line=26,title=phptramp%3A%3Ahop 3 of \$config chain from "
             . "Demo\\Controller%3A%3Ahandle\n";
 
         $reporter = new GithubReporter(new Thresholds(3, null), $this->paths());

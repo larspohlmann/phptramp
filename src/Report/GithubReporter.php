@@ -78,7 +78,7 @@ final class GithubReporter implements Reporter
 
         return '::' . $severity->label()
             . ' file=' . $this->escapeProperty($this->paths->relativize($anchor->file))
-            . ',line=' . $anchor->line
+            . ',line=' . ($anchor->forwardLine ?? $anchor->line)
             . ',title=' . $this->escapeProperty($title);
     }
 
@@ -96,7 +96,7 @@ final class GithubReporter implements Reporter
         $title = 'phptramp::hop ' . ($index + 1) . ' of $' . $finding->param . ' chain from ' . $finding->origin;
 
         return '::notice file=' . $this->escapeProperty($this->paths->relativize($hop->file))
-            . ',line=' . $hop->line
+            . ',line=' . ($hop->forwardLine ?? $hop->line)
             . ',title=' . $this->escapeProperty($title);
     }
 
