@@ -179,8 +179,12 @@ final class ConfigLoader
 
     private function requireColorMode(string $key, mixed $value): string
     {
+        if (! is_string($value)) {
+            throw new ConfigException("config key \"{$key}\" must be a string");
+        }
+
         $valid = ['always', 'auto', 'never'];
-        if (! is_string($value) || ! in_array($value, $valid, true)) {
+        if (! in_array($value, $valid, true)) {
             throw new ConfigException("config key \"{$key}\" must be one of: always, auto, never");
         }
 

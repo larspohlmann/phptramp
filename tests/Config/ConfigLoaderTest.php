@@ -264,7 +264,7 @@ final class ConfigLoaderTest extends TestCase
         $this->writeConfig('phptramp.json', '{"colorMode": 3}');
 
         $this->expectException(ConfigException::class);
-        $this->expectExceptionMessage('config key "colorMode" must be one of: always, auto, never');
+        $this->expectExceptionMessage('config key "colorMode" must be a string');
 
         (new ConfigLoader())->load($this->directory);
     }

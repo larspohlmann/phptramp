@@ -209,11 +209,12 @@ final class ApplicationTest extends TestCase
         self::assertStringNotContainsString("\e[", $out);
     }
 
-    public function testPrettyFormatWithColorAutoOmitsAnsiOnNonTty(): void
+    public function testColorAutoDowngradesPrettyToTextOnNonTty(): void
     {
         [$exitCode, $out] = $this->runPretty('--color=auto');
 
         self::assertSame(1, $exitCode);
+        self::assertStringStartsWith('FINDING', $out);
         self::assertStringNotContainsString("\e[", $out);
     }
 
