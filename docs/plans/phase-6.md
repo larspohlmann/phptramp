@@ -354,7 +354,7 @@ fixed by `git flow init -d` (tag prefix `v`), never improvised around.
   `https://github.com/larspohlmann/phptramp` on packagist.org (requires the
   maintainer's Packagist login) and enable the GitHub hook for auto-updates.
 - [ ] **Step 8:** verify from the outside: in a scratch directory,
-  `composer require --dev larspohlmann/phptramp:^0.1` succeeds and
+  `composer require --dev phptramp/phptramp:^0.1` succeeds and
   `vendor/bin/phptramp --version` prints `phptramp 0.1.0`.
 
 ---

@@ -25,7 +25,7 @@ filters, not analysis shortcuts (chains cross files).
 
 ## Global Constraints
 
-- Package `larspohlmann/phptramp`, MIT, binary `vendor/bin/phptramp`, runtime PHP `>=8.2`.
+- Package `phptramp/phptramp`, MIT, binary `vendor/bin/phptramp`, runtime PHP `>=8.2`.
 - Only production dependency: `nikic/php-parser ^5`. No symfony/console — a hand-rolled
   `ArgvParser` keeps the tool conflict-free as a `require-dev` install.
 - Exit codes: `0` = no findings ≥ limit, `1` = findings ≥ limit, `2` = tool error.
