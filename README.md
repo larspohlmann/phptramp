@@ -5,7 +5,7 @@
 > before being used."
 
 [![CI](https://github.com/larspohlmann/phptramp/actions/workflows/ci.yml/badge.svg)](https://github.com/larspohlmann/phptramp/actions/workflows/ci.yml)
-[![Latest Version](https://img.shields.io/packagist/v/larspohlmann/phptramp)](https://packagist.org/packages/larspohlmann/phptramp)
+[![Latest Version](https://img.shields.io/packagist/v/phptramp/phptramp)](https://packagist.org/packages/phptramp/phptramp)
 [![PHP ≥ 8.2](https://img.shields.io/badge/php-%E2%89%A5%208.2-777bb3)](composer.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -70,7 +70,7 @@ reads a unified diff from a file, or from stdin with `-`, instead — either alw
 ## Installation
 
 ```bash
-composer require --dev larspohlmann/phptramp
+composer require --dev phptramp/phptramp
 ```
 
 ### `composer tramp`

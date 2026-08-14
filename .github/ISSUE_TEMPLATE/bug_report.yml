@@ -6,7 +6,7 @@ body:
     id: phptramp-version
     attributes:
       label: phptramp version
-      description: Output of `composer show larspohlmann/phptramp` (or the git ref).
+      description: Output of `composer show phptramp/phptramp` (or the git ref).
       placeholder: "0.1.0"
     validations:
       required: true
