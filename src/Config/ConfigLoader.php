@@ -85,6 +85,7 @@ final class ConfigLoader
         $folders = [];
         $files = [];
         $exclude = $defaults->exclude;
+        $excludeTerminals = $defaults->excludeTerminals;
         $limit = $defaults->limit;
         $warnLimit = $defaults->warnLimit;
         $minClasses = $defaults->minClasses;
@@ -97,6 +98,7 @@ final class ConfigLoader
             match ($key) {
                 'paths' => $this->assignPaths($value, $folders, $files),
                 'exclude' => $exclude = $this->requireStringList('exclude', $value),
+                'excludeTerminals' => $excludeTerminals = $this->requireStringList('excludeTerminals', $value),
                 'limit' => $limit = $this->requireInt('limit', $value),
                 'warnLimit' => $warnLimit = $this->requireInt('warnLimit', $value),
                 'minClasses' => $minClasses = $this->requireInt('minClasses', $value),
@@ -117,6 +119,7 @@ final class ConfigLoader
             format: $format,
             baseline: $baseline,
             exclude: $exclude,
+            excludeTerminals: $excludeTerminals,
             cacheDir: $cacheDir,
             colorMode: $colorMode,
         );

@@ -27,5 +27,20 @@ final class OptionsTest extends TestCase
         self::assertFalse($options->dumpIndex);
         self::assertFalse($options->help);
         self::assertFalse($options->version);
+        self::assertSame([], $options->excludeTerminals);
+    }
+
+    public function testWithFormatChangesOnlyTheFormat(): void
+    {
+        $options = new Options(
+            folders: ['src'],
+            exclude: ['vendor'],
+            excludeTerminals: ['stored'],
+        );
+
+        $downgraded = $options->withFormat('text');
+
+        self::assertSame('text', $downgraded->format);
+        self::assertEquals($options, $downgraded->withFormat($options->format));
     }
 }

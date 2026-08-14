@@ -363,4 +363,18 @@ final class ArgvParserTest extends TestCase
             self::assertStringContainsString('purple', $e->getMessage());
         }
     }
+
+    public function testExcludeTerminalIsRepeatable(): void
+    {
+        $options = (new ArgvParser())->parse(
+            ['--folder', 'src', '--exclude-terminal', 'stored', '--exclude-terminal=unused-end'],
+        );
+
+        self::assertSame(['stored', 'unused-end'], $options->excludeTerminals);
+    }
+
+    public function testExcludeTerminalDefaultsToEmpty(): void
+    {
+        self::assertSame([], (new ArgvParser())->parse(['--folder', 'src'])->excludeTerminals);
+    }
 }

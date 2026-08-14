@@ -115,10 +115,9 @@ Surface:
   untouched; adding a future `TerminalKind` cannot silently change behaviour,
   which an allowlist default would not guarantee.
 
-Values are validated against `TerminalKind`'s backing values at both entry
-points, each throwing its own exception type with its own wording
-(`InvalidArgsException` from `ArgvParser`, `ConfigException` from
-`ConfigLoader`) — the same split the existing options already use. Any kind is
+Values are validated in one place — `TerminalKindFilter::fromNames()`, which
+`Application::analyze()` calls before `buildIndex()`, so a typo still fails
+fast (exit 2) without the name→enum mapping living in three files. Any kind is
 accepted, including `used`; excluding it is pointless but harmless, and a
 whitelist of "sensible" kinds would be a second thing to maintain.
 
