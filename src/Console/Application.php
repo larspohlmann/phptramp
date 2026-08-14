@@ -456,6 +456,9 @@ final class Application
             Cache:
               --no-cache                Disable the per-file index cache (default: on at .phptramp.cache/)
 
+            Config:
+              --no-config               Ignore phptramp.json / phptramp.dist.json (drive everything from flags)
+
             Debugging:
               --dump-index              Print the classified method index as JSON and exit
 
