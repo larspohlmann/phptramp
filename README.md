@@ -115,6 +115,8 @@ phptramp [options]
   --generate-baseline <f>   Write current findings to a baseline file
   --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
   --no-cache                Disable the per-file index cache (re-parse every file)
+  --no-config               Ignore phptramp.json / phptramp.dist.json (drive everything from flags)
+  --dump-index              Print the classified method index as JSON and exit
 ```
 
 Exit codes: `0` no finding at error severity, `1` at least one finding at/over
