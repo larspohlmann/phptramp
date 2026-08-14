@@ -66,6 +66,28 @@ finding distinguished by this `→N` value.
 reads a unified diff from a file, or from stdin with `-`, instead — either always implies
 `--changed-only`. See [docs/ci.md](docs/ci.md) for GitHub Actions and GitLab recipes.
 
+### Construction and delegation aren't tramp data
+
+A subclass constructor that forwards a parameter on to `parent::__construct()` — or
+any other `parent::` call — is still the same object handling its own value, not a
+value crossing a collaborator boundary. That node scores neither a hop nor a class and
+is marked `(parent)` in the chain. `self::`/`static::` calls are unaffected — same
+class, ordinary hop.
+
+```text
+FINDING  $config: 1 pass-through hop across 2 classes
+  origin    Demo\SpecificHandler::__construct($config)  src/Demo.php:19→21  (parent)
+  hop 2     Demo\BaseHandler::__construct($config)      src/Demo.php:11→13
+  terminal  Demo\Mailer::send($config)                  src/Demo.php:29  (stored)
+```
+
+The chain shows three nodes but scores only one hop across two classes — the
+`(parent)` marker on the origin is why: `SpecificHandler::__construct` delegates to
+its base rather than crossing to a collaborator, so it doesn't count.
+
+Teams that additionally don't want chains ending in a constructor or value object can
+set `--exclude-terminal stored` (see [CLI](#cli) and [Configuration](#configuration)).
+
 ## Installation
 
 ```bash
@@ -111,6 +133,7 @@ phptramp [options]
   --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
   --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
   --explain                 Show why chains ended (call resolution trace)
+  --exclude-terminal <kind> Do not report chains ending in <kind> (repeatable; used|stored|&-terminated|unused-end|external|truncated)
   --changed-only            Only report chains touching changed lines
   --git-base <ref>          Diff base for --changed-only (default: origin/main)
   --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
@@ -147,6 +170,7 @@ key, or a value of the wrong type, is a config error rather than a silently igno
 | `limit` | integer | `--limit` |
 | `warnLimit` | integer | `--warn-limit` |
 | `minClasses` | integer | `--min-classes` |
+| `excludeTerminals` | list of strings | `--exclude-terminal`; **unions** with the flag rather than being replaced by it — `{"excludeTerminals":["stored"]}` plus `--exclude-terminal external` on the command line excludes both. That is the opposite of `paths`/`--folder`, where the first CLI path replaces config-seeded paths: the config file is project policy, and a one-off CI run adds to it rather than overriding it. |
 | `format` | string | `--format` |
 | `baseline` | string | `--baseline` |
 | `cache` | string | directory for the per-file index cache (default: `.phptramp.cache/`, resolved relative to the config file's directory) |

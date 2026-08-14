@@ -56,14 +56,19 @@ This amends frozen rule 4 in `docs/plan.md`, which is the point of the issue
 
 | Chain | `hops` | `classes` | Reported? |
 |---|---|---|---|
-| `Sub::__construct` → `parent::` → `Base::__construct` (stores) | 0 | 1 | never — 0 is below every positive limit |
-| `A` → `parent::` → `B` → `parent::` → `C` (stores) | 0 | 1 | never |
+| `Sub::__construct` → `parent::` → `Base::__construct` (stores) | 0 | 1 | never — see below |
+| `A` → `parent::` → `B` → `parent::` → `C` (stores) | 0 | 1 | never — see below |
 | `Sub::__construct` → `parent::` → `Base` → collaborator `D` (stores) | 1 | 2 | only at `--limit 1` |
 | collaborator `X` → `Sub::__construct` → `parent::` → `Base` (stores) | 1 | 2 | only at `--limit 1` |
 
-A 0-hop finding is unreachable: `Thresholds::severityOf()` reports at
-`hops >= limit` only when `limit > 0`, and `warnLimit` of `0` normalizes to
-off. So pure delegation chains are still *built* — they just never surface.
+No reporter surfaces a 0-hop finding, but not for a single uniform reason:
+threshold-based reporters filter it out via `Thresholds::severityOf()`
+(`hops >= limit` only when `limit > 0`, and `warnLimit` of `0` normalizes to
+off), while `SummaryReporter` deliberately ignores thresholds — it renders
+every chain so a legacy codebase can be triaged before a `--limit` is
+chosen — so it needs an explicit `$finding->hops > 0` skip instead: a chain
+that scores no hops is delegation, not a chain. So pure delegation chains
+are still *built* — they just never surface.
 
 ## 2. Cut the `hops`-as-index coupling (prerequisite refactor)
 
