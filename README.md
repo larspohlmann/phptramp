@@ -4,16 +4,10 @@
 > methods that never use them — "this parameter was passed through 4 classes / 5 methods
 > before being used."
 
-**Status: v0.1.0** — the first release. phptramp detects tramp data across
-file boundaries: `phptramp --folder src` stitches forwarding chains across files
-and prints findings in any of seven formats, exiting `0`/`1`/`2`. A
-`phptramp.json` config file, `#[TrampIgnore]`/`// phptramp-ignore` suppression,
-and a `--warn-limit` warning tier are all wired up. Diff-aware mode
-(`--changed-only`/`--git-base`/`--diff`) and baselining
-(`--generate-baseline`/`--baseline`/`--fail-on-stale`) are shipped too — see
-below. A per-file index cache (default-on, `--no-cache` to disable) makes warm
-re-runs fast enough for per-save IDE use. The classifier and whole-project
-index remain inspectable via `--dump-index`.
+[![CI](https://github.com/larspohlmann/phptramp/actions/workflows/ci.yml/badge.svg)](https://github.com/larspohlmann/phptramp/actions/workflows/ci.yml)
+[![Latest Version](https://img.shields.io/packagist/v/larspohlmann/phptramp)](https://packagist.org/packages/larspohlmann/phptramp)
+[![PHP ≥ 8.2](https://img.shields.io/badge/php-%E2%89%A5%208.2-777bb3)](composer.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ## What it does
 
@@ -36,6 +30,13 @@ property, never calls a method on it, never uses it in an expression. Long hop c
 the "tramp data" smell: every method in the middle is coupled to a value it has no
 business knowing about. The fix is usually a parameter object, a context object, or
 dependency injection at the terminal — this tool tells you *where*.
+
+Construction and delegation don't count: a constructor forwarding to
+`parent::__construct()` (or any `parent::` call) is the same object
+handling its own value, so that node scores neither a hop nor a class and
+is marked `(parent)` in the chain.
+
+## Diff-aware CI mode
 
 The flagship feature is diff-aware CI mode: run it on a pull request and it reports
 **"your edit made this chain longer"**, marking exactly which hops are yours.
@@ -66,28 +67,6 @@ finding distinguished by this `→N` value.
 reads a unified diff from a file, or from stdin with `-`, instead — either always implies
 `--changed-only`. See [docs/ci.md](docs/ci.md) for GitHub Actions and GitLab recipes.
 
-### Construction and delegation aren't tramp data
-
-A subclass constructor that forwards a parameter on to `parent::__construct()` — or
-any other `parent::` call — is still the same object handling its own value, not a
-value crossing a collaborator boundary. That node scores neither a hop nor a class and
-is marked `(parent)` in the chain. `self::`/`static::` calls are unaffected — same
-class, ordinary hop.
-
-```text
-FINDING  $config: 1 pass-through hop across 2 classes
-  origin    Demo\SpecificHandler::__construct($config)  src/Demo.php:19→21  (parent)
-  hop 2     Demo\BaseHandler::__construct($config)      src/Demo.php:11→13
-  terminal  Demo\Mailer::send($config)                  src/Demo.php:29  (stored)
-```
-
-The chain shows three nodes but scores only one hop across two classes — the
-`(parent)` marker on the origin is why: `SpecificHandler::__construct` delegates to
-its base rather than crossing to a collaborator, so it doesn't count.
-
-Teams that additionally don't want chains ending in a constructor or value object can
-set `--exclude-terminal stored` (see [CLI](#cli) and [Configuration](#configuration)).
-
 ## Installation
 
 ```bash
@@ -111,13 +90,8 @@ composer tramp
 composer tramp -- --format json --warn-limit 2
 ```
 
-This repository gates itself with exactly such a script: `composer tramp` runs
-`bin/phptramp` against the paths and thresholds in its own `phptramp.dist.json`
-(`paths: src`, `limit: 6`, `warn-limit: 4`), and CI fails the build on any finding at or
-over the limit. That is the same `composer tramp` invocation a consuming project gets from
-the snippet above — here the paths come from config, so no `--folder` is needed; a consumer
-can configure `paths` the same way or pass `--folder src` inline. (`--no-config` bypasses
-the config file entirely when you want to drive everything from flags.)
+This repository gates itself with exactly this script — see its
+own [`phptramp.dist.json`](phptramp.dist.json).
 
 ## CLI
 
@@ -148,80 +122,26 @@ Exit codes: `0` no finding at error severity, `1` at least one finding at/over
 
 ## Configuration
 
-phptramp reads `phptramp.json` (falling back to `phptramp.dist.json`) from the current
-working directory. CLI flags always take precedence over the config file. An unknown
-key, or a value of the wrong type, is a config error rather than a silently ignored typo.
+phptramp reads `phptramp.json` (falling back to `phptramp.dist.json`) from
+the current working directory; CLI flags always win. All keys, the index
+cache, and performance numbers are documented in
+[docs/configuration.md](docs/configuration.md).
 
 ```json
 {
     "paths": ["src"],
-    "exclude": ["src/Legacy/*.php"],
     "limit": 3,
-    "warnLimit": 2,
-    "minClasses": 0,
-    "format": "json"
+    "warnLimit": 2
 }
 ```
-
-| Key | Type | Same as |
-|---|---|---|
-| `paths` | list of strings | entries ending in `.php` become `--file`s, everything else a `--folder` |
-| `exclude` | list of strings | `fnmatch` globs matched against each folder-discovered file's path, relative to the config file's directory; explicit files (`paths` entries ending in `.php`) are never excluded |
-| `limit` | integer | `--limit` |
-| `warnLimit` | integer | `--warn-limit` |
-| `minClasses` | integer | `--min-classes` |
-| `excludeTerminals` | list of strings | `--exclude-terminal`; **unions** with the flag rather than being replaced by it — `{"excludeTerminals":["stored"]}` plus `--exclude-terminal external` on the command line excludes both. That is the opposite of `paths`/`--folder`, where the first CLI path replaces config-seeded paths: the config file is project policy, and a one-off CI run adds to it rather than overriding it. |
-| `format` | string | `--format` |
-| `baseline` | string | `--baseline` |
-| `cache` | string | directory for the per-file index cache (default: `.phptramp.cache/`, resolved relative to the config file's directory) |
-
-## Index cache
-
-phptramp caches each source file's parsed index under `.phptramp.cache/` (a
-per-file cache, default-on). The cache is what makes warm re-runs — including
-per-save IDE invocations — cheap: the whole-project index (the part call
-resolution needs) rebuilds from cache instead of re-parsing every file.
-
-- **Disable** with `--no-cache`, or **move the directory** with the `cache`
-  config key (see [Configuration](#configuration)).
-- **Identity-validated and version-keyed.** Each entry stores the source
-  file's path, mtime, and size, plus the tool and payload-format versions. Any
-  mismatch — an edited file, a bumped version, a corrupt or stale entry — is
-  a silent cache miss followed by a fresh parse. A stale or corrupt cache
-  **never changes findings**.
-- **Safe to wipe.** Delete `.phptramp.cache/` any time; the next run simply
-  re-parses and repopulates it. Add `/.phptramp.cache/` to your own
-  `.gitignore` so the cache is not committed.
-
-### Performance
-
-Recorded 2026-08-11 on the maintainer's machine (Apple Silicon, PHP 8.4.23):
-
-| Run | Wall-clock | Notes |
-|---|---|---|
-| `--folder vendor` cold | ≈ 19.6s | 4,610 files / 601,867 lines parsed |
-| `--folder vendor` warm | ≈ 4.5s | cache hot — indexing ≈ 0; the residual is chain resolution + reporting |
-| `--folder src` cold (36 files) | ≈ 0.24s | small project baseline |
-| Extrapolation | ≈ 1.6s cold per 50k LOC | linear in parsed lines |
-
-The cache eliminates the parsing portion of a run (≈ 15s saved on the
-`--folder vendor` measurement); chain resolution and reporting are unchanged.
-On a typical `src/` the warm per-save run is effectively instant after the
-first cold run. See [docs/phpstorm.md](docs/phpstorm.md) for the IDE use this
-enables.
 
 ## Output formats
 
 `--format` selects the renderer; all seven are implemented and each has an exact-string
-unit test. `json` is additionally exercised end-to-end by the `tests/fixtures/` harness,
-which always runs with `--format json`.
+unit test.
 
-`pretty` is the default when STDOUT is a TTY. In `--color=auto` (the default),
-non-TTY invocations (pipes, CI redirection) fall back to `text` automatically.
-`--color=never` keeps plain `pretty` in a pipe; `--color=always` keeps colored
-`pretty` (the escape hatch for piping into `less -R`). Use `--color=never` to
-suppress color on a TTY, or set the `NO_COLOR` environment variable. `NO_COLOR`
-is honored only in `auto`; `always` and `never` are absolute.
+`pretty` is the default on a TTY; pipes and CI fall back to `text` automatically.
+`--color=always|auto|never` overrides (`NO_COLOR` is honored in `auto` mode).
 
 | Format | One-line example |
 |---|---|
@@ -266,41 +186,11 @@ severity, so you can scope a noisy warn tier to genuinely wide chains.
 
 ## Baseline
 
-`--baseline` keeps pre-existing tramp data from gating CI on a codebase you adopt
-phptramp against mid-flight. The fingerprint is refactor-stable: a sha1 over the
-chain's semantic identity only (origin FQMN, parameter name, terminal token — never
-line numbers or intermediate hops), so shortening a chain, moving a file, or shifting
-a line does *not* "re-open" a baselined finding. The terminal token is the terminal
-FQMN when the chain resolves one, else the terminal kind (`external`/`truncated`);
-a chain whose truncation reason changes when resolution improves stays baselined.
-
-The adoption story:
-
-1. **Snapshot.** Run `phptramp --folder src --generate-baseline phptramp-baseline.json`
-   once on the current tree. The file is sorted, stable JSON — one entry per finding,
-   diff-clean to commit and review.
-2. **Commit.** Check `phptramp-baseline.json` into the repo alongside `phptramp.json`.
-3. **Gate.** Run `phptramp --folder src --baseline phptramp-baseline.json` in CI.
-   Every entry in the file is invisible to the reporters and the exit code —
-   identical to not existing. New or re-shaped chains above `--limit` fail the build
-   as usual.
-4. **Shrink.** Fix a baselined chain and the matching entry becomes *stale*: phptramp
-   prints `phptramp: stale baseline entry: <…>` on stderr and (with `--fail-on-stale`)
-   exits `1`, nudging you to delete the line and let the gate cover that chain again.
-
-`--fail-on-stale` opts a repo into strict stale hygiene — exit `1` whenever a
-baseline entry or a suppression matches nothing. Without it, stale lines are
-stderr-only warnings and never change the exit code.
-
-### `--changed-only` interaction
-
-Stale detection is **skipped entirely under `--changed-only`** (full runs only).
-The diff filter removes most chains before the baseline is matched, so "stale"
-would be almost everything almost always — meaningless noise. Compose
-`--changed-only --baseline` on PRs to gate on *new* chains touching the diff while
-the baseline keeps the rest quiet; run a full scan (without `--changed-only`) on a
-schedule or nightly to surface stale entries and prune the file. See
-[docs/ci.md](docs/ci.md) for the legacy-adoption recipe.
+Adopting phptramp on a codebase with existing tramp data? `--baseline`
+snapshots today's findings so CI only gates *new* chains, with
+refactor-stable fingerprints that survive renames and moved lines — and
+`--fail-on-stale` nudges you to prune entries as you fix them. The full
+workflow is in [docs/baseline.md](docs/baseline.md).
 
 ## IDE integration
 
@@ -313,7 +203,15 @@ cover CI annotation ecosystems, including GitHub Code Scanning.
 
 - **No auto-fix.** Fixing tramp data means refactoring (parameter objects, DI rewiring),
   which is not mechanically safe. phptramp reports; you decide.
+- **No second production dependency.** `nikic/php-parser` is the only one, deliberately.
+
+## Contributing
+
+Contributions are welcome — see the
+[contributing guide](.github/CONTRIBUTING.md) for the workflow and the CI
+gates, and the [code of conduct](CODE_OF_CONDUCT.md). Bugs are best reported
+with the [bug report form](https://github.com/larspohlmann/phptramp/issues/new?template=bug_report.yml).
 
 ## License
 
-MIT
+[MIT](LICENSE)
