@@ -40,7 +40,6 @@ final class Options
         public readonly bool $version = false,
         public readonly bool $failOnStale = false,
         public readonly array $exclude = [],
-        /** @param list<string> $excludeTerminals TerminalKind backing values */
         public readonly array $excludeTerminals = [],
         public readonly bool $noCache = false,
         public readonly string $cacheDir = '.phptramp.cache',

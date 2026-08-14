@@ -56,10 +56,6 @@ final class TerminalKindFilter
      */
     public function filter(array $findings): array
     {
-        if ($this->excluded === []) {
-            return $findings;
-        }
-
         $kept = [];
         foreach ($findings as $finding) {
             if (! in_array($finding->terminalKind, $this->excluded, true)) {

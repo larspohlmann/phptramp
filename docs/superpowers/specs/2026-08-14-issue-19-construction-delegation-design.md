@@ -97,7 +97,13 @@ A new `PhpTramp\Chain\TerminalKindFilter`, alongside the existing
 final class TerminalKindFilter
 {
     /** @param list<TerminalKind> $excluded */
-    public function __construct(private readonly array $excluded) {}
+    private function __construct(private readonly array $excluded) {}
+
+    /**
+     * @param list<string> $names TerminalKind backing values
+     * @throws InvalidArgsException on a name that is not a terminal kind
+     */
+    public static function fromNames(array $names): self;
 
     /**
      * @param list<Finding> $findings
@@ -171,15 +177,26 @@ Fixtures (`tests/fixtures/<case>/`, input codebase + expected output):
   forwards to a collaborator. Expects the collaborator hop counted and the
   parent hop discounted (`1 hop across 2 classes`), proving the discount is
   not a blanket suppression.
-- `exclude-terminal-stored` — a `stored`-terminated chain that fires by
-  default, run with `--exclude-terminal stored`, expecting `[]`.
+- `exclude-terminal-stored` — two chains that both fire at the same limit and
+  hop/class shape, one `stored`-terminated and one `used`-terminated, run with
+  `--exclude-terminal stored`. Expects the one surviving `used` finding, not
+  `[]` — proving the filter drops the excluded chain specifically, rather than
+  everything happening to pass a lowered threshold.
 
 Unit tests:
 
 - `TerminalKindTest` — `keepsTerminalNode()` for all six cases.
-- `ArgvParserTest` — repeatable `--exclude-terminal`, unknown kind rejected.
-- `ConfigLoaderTest` — `excludeTerminals` list, wrong type rejected, unknown
-  kind rejected.
+- `TerminalKindFilterTest` — excluded kind dropped, every other kind survives,
+  empty exclusion list keeps everything, `fromNames()` rejects an unknown kind.
+- `ArgvParserTest` — repeatable `--exclude-terminal`, default empty, unions
+  with a config-seeded default rather than replacing it (unlike `--folder`).
+  No unknown-kind test here: `ArgvParser` does not validate, `fromNames()`
+  does, in the one place validation lives.
+- `ConfigLoaderTest` — `excludeTerminals` list, wrong type rejected. No
+  unknown-kind test here either, for the same reason.
+- `ApplicationTest` — a suppressed, `stored`-terminated chain run with
+  `--exclude-terminal stored --fail-on-stale` does not go stale, pinning that
+  the terminal filter runs after `SuppressionFilter`.
 - `ChainBuilderTest` — `viaParent` marking, hop and class discounting.
 - Reporter tests — `(parent)` annotation in text/pretty, `viaParent` in JSON.
 

@@ -377,4 +377,19 @@ final class ArgvParserTest extends TestCase
     {
         self::assertSame([], (new ArgvParser())->parse(['--folder', 'src'])->excludeTerminals);
     }
+
+    /**
+     * Unlike paths (where the first CLI --folder replaces config-seeded
+     * paths, {@see testFirstPathFlagClearsSeededPaths}), --exclude-terminal
+     * unions with a config-seeded excludeTerminals: a project-level policy
+     * list that a CI run can only add to, never silently drop from.
+     */
+    public function testExcludeTerminalUnionsWithSeededDefault(): void
+    {
+        $defaults = new Options(excludeTerminals: ['stored']);
+
+        $options = (new ArgvParser())->parse(['--exclude-terminal', 'external'], $defaults);
+
+        self::assertSame(['stored', 'external'], $options->excludeTerminals);
+    }
 }

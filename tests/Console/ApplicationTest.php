@@ -729,6 +729,33 @@ final class ApplicationTest extends TestCase
         self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale baseline entry:'));
     }
 
+    /**
+     * Pins the ordering decision this task exists for: the terminal filter
+     * must run after SuppressionFilter, not before. The fixture's only chain
+     * is stored-terminated and its forwarding hop carries #[TrampIgnore]. If
+     * the terminal filter ran first, the chain would be dropped before
+     * SuppressionFilter ever saw it, its suppression key would never fire,
+     * and --fail-on-stale would flip 0 to 1 on a spurious "stale suppression"
+     * line. Correct order: suppression fires first (the key lands in
+     * firedKeys), the terminal filter then has nothing left to exclude, and
+     * the run exits 0 with no stale-suppression line.
+     */
+    public function testExcludedStoredChainWithTrampIgnoreDoesNotGoStale(): void
+    {
+        $folder = $this->fixtureWithSuppressedStoredChain();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '1', '--warn-limit', '0',
+            '--exclude-terminal', 'stored', '--fail-on-stale',
+        ]);
+
+        self::assertSame(0, $exitCode);
+        self::assertSame(
+            [],
+            $this->linesStartingWith(self::contents($this->stderr), 'phptramp: stale suppression:'),
+        );
+    }
+
     public function testChangedOnlySkipsStaleDetectionEntirely(): void
     {
         $folder = $this->fixtureWithChainAndUnusedIgnore();
@@ -1102,6 +1129,28 @@ final class ApplicationTest extends TestCase
             . 'class ServiceB { public function run(Cfg $config): void { new Mailer($config); } } '
             . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } } '
             . 'class Unused { #[TrampIgnore] public function neverCalled(Cfg $p): void { $p->x(); } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
+    }
+
+    /**
+     * A single chain, stored-terminated (Mailer::deliver assigns to a
+     * property), whose sole forwarding hop (Controller::handle) carries a
+     * method-level #[TrampIgnore]. Used to pin that the terminal filter runs
+     * after suppression, not before.
+     */
+    private function fixtureWithSuppressedStoredChain(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class Controller { #[TrampIgnore] public function handle(Cfg $config): void '
+            . '{ (new Mailer())->deliver($config); } } '
+            . 'class Mailer { private ?Cfg $config = null; '
+            . 'public function deliver(Cfg $config): void { $this->config = $config; } }';
         file_put_contents($folder . '/Demo.php', $code);
 
         return $folder;
