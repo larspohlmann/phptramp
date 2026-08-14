@@ -31,6 +31,7 @@ final class ArgvParser
         '--diff',
         '--baseline',
         '--generate-baseline',
+        '--exclude-terminal',
     ];
 
     private const BOOL_FLAGS = [
@@ -65,6 +66,8 @@ final class ArgvParser
     private bool $clearedSeededPaths = false;
     /** @var list<string> */
     private array $exclude = [];
+    /** @var list<string> */
+    private array $excludeTerminals = [];
     private string $cacheDir = '.phptramp.cache';
 
     /**
@@ -100,6 +103,7 @@ final class ArgvParser
             version: $this->bools->version,
             failOnStale: $this->bools->failOnStale,
             exclude: $this->exclude,
+            excludeTerminals: $this->excludeTerminals,
             noCache: $this->bools->noCache,
             cacheDir: $this->cacheDir,
         );
@@ -127,6 +131,7 @@ final class ArgvParser
         $this->baseline = $defaults->baseline;
         $this->generateBaseline = $defaults->generateBaseline;
         $this->exclude = $defaults->exclude;
+        $this->excludeTerminals = $defaults->excludeTerminals;
         $this->cacheDir = $defaults->cacheDir;
         $this->clearedSeededPaths = false;
     }
@@ -179,6 +184,7 @@ final class ArgvParser
             '--diff' => $this->applyDiffFlag($value),
             '--baseline' => $this->baseline = $value,
             '--generate-baseline' => $this->generateBaseline = $value,
+            '--exclude-terminal' => $this->excludeTerminals[] = $value,
             default => throw new InvalidArgsException("unknown option: {$name}"),
         };
     }

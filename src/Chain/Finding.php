@@ -6,8 +6,9 @@ namespace PhpTramp\Chain;
 
 /**
  * One maximal tramp-data chain: a parameter forwarded, unused, from its origin
- * method to a terminal. `hops` counts the pure-forward nodes only (the terminal
- * is never counted); thresholding against `--limit` is the caller's job.
+ * method to a terminal. `hops` is the score: pure-forward nodes that are not
+ * `parent::` delegators (the terminal is never counted); thresholding against
+ * `--limit` is the caller's job.
  */
 final class Finding
 {
@@ -50,5 +51,21 @@ final class Finding
             $this->notes,
             $this->trace,
         );
+    }
+
+    /** The terminal node, when the chain has one, is always the last entry. */
+    public function hasTerminalNode(): bool
+    {
+        return $this->terminalKind->keepsTerminalNode();
+    }
+
+    /**
+     * The chain minus its terminal node — every node that forwards the value on.
+     *
+     * @return list<Hop>
+     */
+    public function forwardingHops(): array
+    {
+        return $this->hasTerminalNode() ? array_slice($this->chain, 0, -1) : $this->chain;
     }
 }

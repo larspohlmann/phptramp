@@ -18,6 +18,7 @@ final class Options
      * @param list<string> $folders
      * @param list<string> $files
      * @param list<string> $exclude
+     * @param list<string> $excludeTerminals TerminalKind backing values
      */
     public function __construct(
         public readonly array $folders = [],
@@ -39,6 +40,7 @@ final class Options
         public readonly bool $version = false,
         public readonly bool $failOnStale = false,
         public readonly array $exclude = [],
+        public readonly array $excludeTerminals = [],
         public readonly bool $noCache = false,
         public readonly string $cacheDir = '.phptramp.cache',
     ) {
@@ -71,6 +73,7 @@ final class Options
             version: $this->version,
             failOnStale: $this->failOnStale,
             exclude: $this->exclude,
+            excludeTerminals: $this->excludeTerminals,
             noCache: $this->noCache,
             cacheDir: $this->cacheDir,
         );

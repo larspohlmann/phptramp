@@ -106,11 +106,11 @@ final class TextReporter implements Reporter
      */
     private function hopRows(Finding $finding): array
     {
-        $hasTerminalNode = count($finding->chain) > $finding->hops;
+        $terminalIndex = $finding->hasTerminalNode() ? count($finding->chain) - 1 : null;
 
         $rows = [];
         foreach ($finding->chain as $index => $hop) {
-            $isTerminal = $hasTerminalNode && $index === $finding->hops;
+            $isTerminal = $index === $terminalIndex;
             $rows[] = [
                 'label' => $this->label($index, $isTerminal),
                 'method' => $hop->fqmn . '($' . $finding->param . ')',
@@ -127,11 +127,16 @@ final class TextReporter implements Reporter
         if ($isTerminal) {
             return '(' . $terminalKind->value . ')';
         }
+
+        $parts = [];
+        if ($hop->viaParent) {
+            $parts[] = '(parent)';
+        }
         if ($hop->changed) {
-            return '*YOURS*';
+            $parts[] = '*YOURS*';
         }
 
-        return '';
+        return implode(' ', $parts);
     }
 
     private function label(int $index, bool $isTerminal): string

@@ -729,6 +729,82 @@ final class ApplicationTest extends TestCase
         self::assertSame([], $this->linesStartingWith($stderr, 'phptramp: stale baseline entry:'));
     }
 
+    /**
+     * Pins the ordering decision this task exists for: the terminal filter
+     * must run after SuppressionFilter, not before. The fixture's only chain
+     * is stored-terminated and its forwarding hop carries #[TrampIgnore]. If
+     * the terminal filter ran first, the chain would be dropped before
+     * SuppressionFilter ever saw it, its suppression key would never fire,
+     * and --fail-on-stale would flip 0 to 1 on a spurious "stale suppression"
+     * line. Correct order: suppression fires first (the key lands in
+     * firedKeys), the terminal filter then has nothing left to exclude, and
+     * the run exits 0 with no stale-suppression line.
+     */
+    public function testExcludedStoredChainWithTrampIgnoreDoesNotGoStale(): void
+    {
+        $folder = $this->fixtureWithSuppressedStoredChain();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '1', '--warn-limit', '0',
+            '--exclude-terminal', 'stored', '--fail-on-stale',
+        ]);
+
+        self::assertSame(0, $exitCode);
+        self::assertSame(
+            [],
+            $this->linesStartingWith(self::contents($this->stderr), 'phptramp: stale suppression:'),
+        );
+    }
+
+    /**
+     * The unknown kind is rejected before the index is built, so the folder's
+     * unparseable file never gets read. Both failures exit 2, so the stderr
+     * message is what distinguishes them: seeing the parse error here would
+     * mean validation had drifted behind buildIndex().
+     */
+    public function testUnknownExcludeTerminalKindExitsTwoBeforeTheIndexIsBuilt(): void
+    {
+        $folder = $this->fixtureWithUnparseableFile();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--exclude-terminal', 'bogus',
+        ]);
+
+        self::assertSame(2, $exitCode);
+        self::assertStringContainsString(
+            'phptramp: unknown terminal kind: bogus (expected used|stored|&-terminated'
+                . '|unused-end|external|truncated)',
+            self::contents($this->stderr),
+        );
+    }
+
+    /**
+     * The counterpart to the suppression case above: excluding a terminal kind
+     * that a *baselined* chain ends in genuinely stops reporting that chain, so
+     * its baseline entry is stale. Accepted, not worked around — it only bites
+     * under --fail-on-stale, which flips the otherwise-clean run to exit 1.
+     */
+    public function testBaselinedChainWhoseTerminalKindBecomesExcludedGoesStale(): void
+    {
+        $folder = $this->fixtureWithOneHopChain();
+        $baselineFile = $folder . '/baseline.json';
+        self::assertSame(0, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '1', '--warn-limit', '0',
+            '--generate-baseline', $baselineFile,
+        ]));
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '1', '--warn-limit', '0',
+            '--baseline', $baselineFile, '--exclude-terminal', 'stored', '--fail-on-stale',
+        ]);
+
+        self::assertSame(1, $exitCode);
+        self::assertCount(
+            1,
+            $this->linesStartingWith(self::contents($this->stderr), 'phptramp: stale baseline entry:'),
+        );
+    }
+
     public function testChangedOnlySkipsStaleDetectionEntirely(): void
     {
         $folder = $this->fixtureWithChainAndUnusedIgnore();
@@ -1054,6 +1130,21 @@ final class ApplicationTest extends TestCase
         return $folder;
     }
 
+    /**
+     * A folder whose only file cannot be parsed, so any run that reaches
+     * buildIndex() fails with a ParseException.
+     */
+    private function fixtureWithUnparseableFile(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        file_put_contents($folder . '/Broken.php', '<?php class {{{');
+
+        return $folder;
+    }
+
     private function fixtureWithTwoHopChain(): string
     {
         $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
@@ -1102,6 +1193,28 @@ final class ApplicationTest extends TestCase
             . 'class ServiceB { public function run(Cfg $config): void { new Mailer($config); } } '
             . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } } '
             . 'class Unused { #[TrampIgnore] public function neverCalled(Cfg $p): void { $p->x(); } }';
+        file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
+    }
+
+    /**
+     * A single chain, stored-terminated (Mailer::deliver assigns to a
+     * property), whose sole forwarding hop (Controller::handle) carries a
+     * method-level #[TrampIgnore]. Used to pin that the terminal filter runs
+     * after suppression, not before.
+     */
+    private function fixtureWithSuppressedStoredChain(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        $code = '<?php namespace Demo; use PhpTramp\Ignore\TrampIgnore; class Cfg {} '
+            . 'class Controller { #[TrampIgnore] public function handle(Cfg $config): void '
+            . '{ (new Mailer())->deliver($config); } } '
+            . 'class Mailer { private ?Cfg $config = null; '
+            . 'public function deliver(Cfg $config): void { $this->config = $config; } }';
         file_put_contents($folder . '/Demo.php', $code);
 
         return $folder;

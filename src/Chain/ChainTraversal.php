@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Chain;
 
+use PhpTramp\Index\CalleeKind;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\MethodInfo;
@@ -117,10 +118,23 @@ final class ChainTraversal
                 $forward->line,
                 false,
                 $param->name,
+                $this->isParentDelegation($forward),
             );
             $advanced = $chain->append($hop, $this->traceLine($method->fqmn, $forward, $resolution), $key);
             $this->follow($resolution, $advanced);
         }
+    }
+
+    /**
+     * A `parent::` call hands the value to the same object's base class, not to
+     * a collaborator. Detected syntactically: php-parser's NameResolver leaves
+     * `parent` unresolved as a special class name, which is also why
+     * CallResolver matches the literal string.
+     */
+    private function isParentDelegation(ForwardSite $forward): bool
+    {
+        return $forward->callee->kind === CalleeKind::StaticCall
+            && $forward->callee->receiverHint === 'parent';
     }
 
     private function follow(Resolution $resolution, PartialChain $chain): void
@@ -205,7 +219,7 @@ final class ChainTraversal
             $chain->hops[0]->fqmn,
             $terminal->fqmn,
             $terminal->kind,
-            count($chain->hops),
+            $this->scoredHops($chain->hops),
             $fullChain,
             $this->distinctClasses($fullChain),
             $terminal->notes,
@@ -214,15 +228,43 @@ final class ChainTraversal
     }
 
     /**
+     * The hop score: forwarding nodes that handed the value to a collaborator.
+     * `parent::` delegators stay in the rendered chain but never score — they
+     * are the same object as the node they delegate into.
+     *
+     * @param list<Hop> $hops
+     */
+    private function scoredHops(array $hops): int
+    {
+        $scored = 0;
+        foreach ($hops as $hop) {
+            if (! $hop->viaParent) {
+                $scored++;
+            }
+        }
+
+        return $scored;
+    }
+
+    /**
+     * The class count: distinct declaring classes the value visited. A
+     * `parent::` delegator is skipped because the base it delegates into is the
+     * same object and stands in for it — but only when that base is actually in
+     * the chain. A chain ending at a delegator (its base is outside the index,
+     * e.g. `extends \RuntimeException`) has nothing downstream to represent it,
+     * so its class counts; the value really did cross into it.
+     *
      * @param list<Hop> $chain
      */
     private function distinctClasses(array $chain): int
     {
         $classes = [];
-        foreach ($chain as $hop) {
-            if ($hop->class !== null) {
-                $classes[$hop->class] = true;
+        $lastIndex = count($chain) - 1;
+        foreach ($chain as $index => $hop) {
+            if ($hop->class === null || ($hop->viaParent && $index !== $lastIndex)) {
+                continue;
             }
+            $classes[$hop->class] = true;
         }
 
         return count($classes);

@@ -59,12 +59,12 @@ final class GithubReporter implements Reporter
      */
     private function annotationLines(Finding $finding, Severity $severity): array
     {
-        $nonTerminalHops = $this->nonTerminalHops($finding);
-        $anchorIndex = $this->anchorIndex($nonTerminalHops);
+        $forwardingHops = $finding->forwardingHops();
+        $anchorIndex = $this->anchorIndex($forwardingHops);
 
         $lines = [$this->anchorAnnotation($finding, $severity, $anchorIndex)];
-        unset($nonTerminalHops[$anchorIndex]);
-        foreach ($nonTerminalHops as $index => $hop) {
+        unset($forwardingHops[$anchorIndex]);
+        foreach ($forwardingHops as $index => $hop) {
             $lines[] = $this->hopNotice($finding, $hop, $index);
         }
 
@@ -101,32 +101,23 @@ final class GithubReporter implements Reporter
     }
 
     /**
-     * The chain index of the first hop marked `changed`, restricted to the
-     * non-terminal hops (0 .. hops-1). Falls back to the origin (index 0) when
-     * none is marked, which is the only case a normal (non diff-aware) run
+     * The index of the first forwarding node marked `changed`, among the
+     * chain's forwarding hops (the terminal node, when present, is excluded by
+     * {@see Finding::forwardingHops()}). Falls back to the origin (index 0)
+     * when none is marked, which is the only case a normal (non diff-aware) run
      * ever produces.
      *
-     * @param array<int, Hop> $nonTerminalHops
+     * @param array<int, Hop> $forwardingHops keyed by chain index
      */
-    private function anchorIndex(array $nonTerminalHops): int
+    private function anchorIndex(array $forwardingHops): int
     {
-        foreach ($nonTerminalHops as $index => $hop) {
+        foreach ($forwardingHops as $index => $hop) {
             if ($hop->changed) {
                 return $index;
             }
         }
 
         return 0;
-    }
-
-    /**
-     * @return array<int, Hop> non-terminal-hop entries keyed by their chain
-     *                         index (0 .. hops-1) — the terminal node, at
-     *                         index hops, is never included
-     */
-    private function nonTerminalHops(Finding $finding): array
-    {
-        return array_slice($finding->chain, 0, $finding->hops, true);
     }
 
     /**

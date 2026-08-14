@@ -178,11 +178,11 @@ final class PrettyReporter implements Reporter
      */
     private function hopRows(Finding $finding): array
     {
-        $hasTerminalNode = count($finding->chain) > $finding->hops;
+        $terminalIndex = $finding->hasTerminalNode() ? count($finding->chain) - 1 : null;
 
         $rows = [];
         foreach ($finding->chain as $index => $hop) {
-            $isTerminal = $hasTerminalNode && $index === $finding->hops;
+            $isTerminal = $index === $terminalIndex;
             $rows[] = [
                 'label' => $this->label($index, $isTerminal),
                 'fqmn' => $hop->fqmn,
@@ -198,13 +198,18 @@ final class PrettyReporter implements Reporter
     private function annotation(Hop $hop, TerminalKind $terminalKind, bool $isTerminal): string
     {
         if ($isTerminal) {
-            return '(' . $terminalKind->value . ')';
-        }
-        if ($hop->changed) {
-            return '*YOURS*';
+            return $this->styler->terminalKind('(' . $terminalKind->value . ')');
         }
 
-        return '';
+        $parts = [];
+        if ($hop->viaParent) {
+            $parts[] = $this->styler->terminalKind('(parent)');
+        }
+        if ($hop->changed) {
+            $parts[] = $this->styler->annotation('*YOURS*');
+        }
+
+        return implode(' ', $parts);
     }
 
     private function label(int $index, bool $isTerminal): string
@@ -237,10 +242,7 @@ final class PrettyReporter implements Reporter
         $rest = $row['fqmn'] . $paramFragment . str_repeat(' ', $fqmnPadding)
             . self::COLUMN_GAP . $this->styler->location($row['location']);
         if ($row['annotation'] !== '') {
-            $styledAnnotation = str_starts_with($row['annotation'], '(')
-                ? $this->styler->terminalKind($row['annotation'])
-                : $this->styler->annotation($row['annotation']);
-            $rest .= self::COLUMN_GAP . $styledAnnotation;
+            $rest .= self::COLUMN_GAP . $row['annotation'];
         }
 
         return $this->labelledLine($row['label'], $labelWidth, $rest);

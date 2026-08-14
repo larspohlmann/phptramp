@@ -7,8 +7,9 @@ namespace PhpTramp\Chain;
 /**
  * One node of a reported chain: the method it lands in and the source location,
  * plus the line of the forwarding call site it leaves through (null on the
- * terminal node, which forwards nowhere), and the node's own parameter name —
- * which the suppression filter matches `#[TrampIgnore]` param entries against.
+ * terminal node, which forwards nowhere), the node's own parameter name — which
+ * the suppression filter matches `#[TrampIgnore]` param entries against — and
+ * whether it forwards on via `parent::`.
  */
 final class Hop
 {
@@ -23,6 +24,12 @@ final class Hop
         public readonly bool $changed = false,
         /** This hop's own parameter name; used for per-hop suppression lookup. */
         public readonly string $param = '',
+        /**
+         * Whether this node forwards on through a `parent::` call — delegation
+         * to the same object's base, not a hand-off to a collaborator, so it
+         * scores neither a hop nor a class (frozen rule 4).
+         */
+        public readonly bool $viaParent = false,
     ) {
     }
 
@@ -40,6 +47,7 @@ final class Hop
             $this->forwardLine,
             $changed,
             $this->param,
+            $this->viaParent,
         );
     }
 }

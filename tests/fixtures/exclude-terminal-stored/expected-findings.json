@@ -1,0 +1,21 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\UsedController::handle",
+            "terminal": "Demo\\Logger::write",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\UsedController::handle", "role": "origin", "file": "src/Demo.php", "line": 29, "forwardLine": 31},
+                {"method": "Demo\\Logger::write", "role": "terminal", "file": "src/Demo.php", "line": 37, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

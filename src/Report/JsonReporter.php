@@ -80,12 +80,11 @@ final class JsonReporter implements Reporter
      */
     private function chainDocument(Finding $finding): array
     {
-        $hasTerminalNode = count($finding->chain) > $finding->hops;
+        $terminalIndex = $finding->hasTerminalNode() ? count($finding->chain) - 1 : null;
 
         $chain = [];
         foreach ($finding->chain as $index => $hop) {
-            $isTerminal = $hasTerminalNode && $index === $finding->hops;
-            $chain[] = $this->hopDocument($hop, $index, $isTerminal);
+            $chain[] = $this->hopDocument($hop, $index, $index === $terminalIndex);
         }
 
         return $chain;
@@ -105,6 +104,11 @@ final class JsonReporter implements Reporter
         ];
         if ($this->changedOnly) {
             $document['changed'] = $hop->changed;
+        }
+        // Emitted only when set: a key on every entry of every chain would be
+        // noise for the common case, and `changed` already sets that precedent.
+        if ($hop->viaParent) {
+            $document['viaParent'] = true;
         }
 
         return $document;

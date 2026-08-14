@@ -86,13 +86,22 @@ implementation. Every bullet is a fixture.
 3. **Constructor storage is use.** `$this->x = $p` (incl. promoted properties) ends the
    chain at the constructor. "Field tramping" through properties is future work, not v0.1.
 4. **Threshold metric:** number of pure-forward methods in the chain (origin included if
-   it purely forwards; terminal never counted). Report when hops ≥ `--limit` (default 6
-   since v0.1.x; was 3 in the initial design review, raised after real-world use showed
-   3-hop chains are too common to gate by default). `--warn-limit` (default 4) adds a
-   warning tier below the limit. `--min-classes <n>` (default 0 = off) suppresses chains
-   traversing fewer than `n` distinct classes. `0` on either threshold disables that
-   tier. Classes traversed is supplementary output, never the primary threshold, but can
-   gate via `--min-classes`.
+   it purely forwards; terminal never counted). A node that forwards on through
+   `parent::` is excluded from the hop count: it delegates to
+   the same object's base, so it is inheritance wiring rather than a value crossing a
+   collaborator boundary (issue #19). It is excluded from the class count too, but only
+   when that base is itself in the chain and therefore stands in for it; a `parent::`
+   node that *ends* the chain because its base sits outside the analyzed index (e.g.
+   `extends \RuntimeException`) has no stand-in, so its class is counted — the value
+   really did cross into it. `self::`/`static::` are unaffected — same class,
+   ordinary hop. Report when hops ≥ `--limit` (default 6 since v0.1.x; was 3 in the
+   initial design review, raised after real-world use showed 3-hop chains are too
+   common to gate by default). `--warn-limit` (default 4) adds a warning tier below the
+   limit. `--min-classes <n>` (default 0 = off) suppresses chains traversing fewer than
+   `n` distinct classes. `--exclude-terminal <kind>` (repeatable, default: none) drops
+   findings whose chain ends in a given `TerminalKind`; it filters, it does not
+   re-score. `0` on either threshold disables that tier. Classes traversed is
+   supplementary output, never the primary threshold, but can gate via `--min-classes`.
 5. **Call resolution (v0.1):** plain functions, `self::`/`static::`/`ClassName::`
    statics, `$this->m()`, calls on values with a single declared class type (params,
    typed properties, `new X`), constructors, trait methods (through `use`), named
@@ -896,3 +905,10 @@ instead of guessing.
   are the one thing PHPStan max + PSR-12 don't cover), and diff-scoped Infection were
   adopted from the maintainer's simple-feed-reader project, including its hard-won
   CI comments (PR-only mutation, `--ignore-msi-with-no-mutations`, PCOV).
+- **`stored` terminals stay findings by default:** issue #19 proposed that a
+  chain ending by handing the value to a constructor or value object should not
+  be a finding. Rejected as a *default*: the README's own headline finding is a
+  `stored` terminal, as are 7 of the 21 findings across `tests/fixtures/`. The
+  issue's noisy example (2 hops across 2 classes) and the README's legitimate
+  one (3 hops across 4 classes) are both `stored`, so terminal kind is not what
+  separates them — hop count is. Exposed as opt-in `--exclude-terminal` instead.

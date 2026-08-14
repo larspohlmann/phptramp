@@ -18,4 +18,19 @@ enum TerminalKind: string
     case Unused = 'unused-end';
     case External = 'external';
     case Truncated = 'truncated';
+
+    /**
+     * Whether a chain ending this way keeps its terminal node in `Finding::$chain`.
+     * `external`/`truncated` left analyzed code, so there is no node to show.
+     * This is the executable form of the rule the class docblock states in prose;
+     * reporters ask here instead of comparing chain length against the hop score,
+     * which counts and no longer indexes.
+     */
+    public function keepsTerminalNode(): bool
+    {
+        return match ($this) {
+            self::Used, self::Stored, self::ByRef, self::Unused => true,
+            self::External, self::Truncated => false,
+        };
+    }
 }

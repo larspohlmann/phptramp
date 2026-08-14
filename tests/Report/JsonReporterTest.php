@@ -100,6 +100,75 @@ final class JsonReporterTest extends TestCase
         self::assertSame($expected, $reporter->render([$finding]));
     }
 
+    public function testViaParentHopEmitsViaParentKeyOnlyOnThatChainEntry(): void
+    {
+        $chain = [
+            new Hop('Demo\Sub::__construct', 'Demo\Sub', 'src/Demo.php', 19, 21, false, 'config', true),
+            new Hop('Demo\Base::__construct', 'Demo\Base', 'src/Demo.php', 11, 13, false, 'config'),
+            new Hop('Demo\Mailer::send', 'Demo\Mailer', 'src/Demo.php', 29, null, false, 'config'),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Sub::__construct',
+            'Demo\Mailer::send',
+            TerminalKind::Stored,
+            1,
+            $chain,
+            2,
+            [],
+            [],
+        );
+
+        $expected = <<<'JSON'
+            {
+                "limit": 1,
+                "warnLimit": null,
+                "minClasses": 0,
+                "findings": [
+                    {
+                        "param": "config",
+                        "severity": "error",
+                        "origin": "Demo\\Sub::__construct",
+                        "terminal": "Demo\\Mailer::send",
+                        "terminalKind": "stored",
+                        "hops": 1,
+                        "classes": 2,
+                        "chain": [
+                            {
+                                "method": "Demo\\Sub::__construct",
+                                "role": "origin",
+                                "file": "src/Demo.php",
+                                "line": 19,
+                                "forwardLine": 21,
+                                "viaParent": true
+                            },
+                            {
+                                "method": "Demo\\Base::__construct",
+                                "role": "hop",
+                                "file": "src/Demo.php",
+                                "line": 11,
+                                "forwardLine": 13
+                            },
+                            {
+                                "method": "Demo\\Mailer::send",
+                                "role": "terminal",
+                                "file": "src/Demo.php",
+                                "line": 29,
+                                "forwardLine": null
+                            }
+                        ],
+                        "notes": []
+                    }
+                ]
+            }
+
+            JSON;
+
+        $reporter = new JsonReporter(new Thresholds(1, null), $this->paths());
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
     public function testChangedOnlyRunAppendsChangedKeyAsLastEntryInEachChainEntry(): void
     {
         $chain = [

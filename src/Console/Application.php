@@ -10,6 +10,7 @@ use PhpTramp\Baseline\BaselineFilter;
 use PhpTramp\Cache\FileIndexCache;
 use PhpTramp\Chain\ChainBuilder;
 use PhpTramp\Chain\Finding;
+use PhpTramp\Chain\TerminalKindFilter;
 use PhpTramp\Config\ConfigException;
 use PhpTramp\Config\ConfigLoader;
 use PhpTramp\Diff\ChangedChainFilter;
@@ -173,6 +174,7 @@ final class Application
     {
         try {
             $thresholds = new Thresholds($options->limit, $options->warnLimit, $options->minClasses);
+            $terminalFilter = TerminalKindFilter::fromNames($options->excludeTerminals);
             $baselineFilter = new BaselineFilter();
             $baseline = $this->consumeBaseline($options, $baselineFilter);
             $index = $this->buildIndex($options);
@@ -187,7 +189,7 @@ final class Application
             $suppression = (new SuppressionFilter($index->suppressions()))->filter(
                 $this->changedOnlyFindings($this->findChains($index), $options),
             );
-            $findings = $suppression->kept;
+            $findings = $terminalFilter->filter($suppression->kept);
         } catch (InvalidArgsException | ParseException | DiffException | BaselineException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
@@ -439,6 +441,7 @@ final class Application
               --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
               --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
               --explain                 Show why chains ended (call resolution trace)
+              --exclude-terminal <kind> Do not report chains ending in <kind> (repeatable; used|stored|&-terminated|unused-end|external|truncated)
 
             Diff-aware mode:
               --changed-only            Only report chains touching changed lines
@@ -469,8 +472,9 @@ final class Application
             terminal output), diff-aware mode (--changed-only / --git-base / --diff),
             baselining (--generate-baseline / --baseline / --fail-on-stale),
             #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
-            config, --warn-limit, --min-classes, --color, and a per-file index cache
-            (--no-cache / the `cache` config key) are all shipped. See docs/plan.md.
+            config, --warn-limit, --min-classes, --color, --exclude-terminal (/ the
+            `excludeTerminals` config key), and a per-file index cache (--no-cache /
+            the `cache` config key) are all shipped. See docs/plan.md.
 
             TXT;
         // phpcs:enable Generic.Files.LineLength.TooLong

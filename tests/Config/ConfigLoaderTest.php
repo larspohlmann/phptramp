@@ -268,4 +268,23 @@ final class ConfigLoaderTest extends TestCase
 
         (new ConfigLoader())->load($this->directory);
     }
+
+    public function testReadsExcludeTerminals(): void
+    {
+        $this->writeConfig('phptramp.json', '{"excludeTerminals": ["stored"]}');
+
+        $options = (new ConfigLoader())->load($this->directory);
+
+        self::assertSame(['stored'], $options->excludeTerminals);
+    }
+
+    public function testExcludeTerminalsMustBeAListOfStrings(): void
+    {
+        $this->writeConfig('phptramp.json', '{"excludeTerminals": "stored"}');
+
+        $this->expectException(ConfigException::class);
+        $this->expectExceptionMessage('config key "excludeTerminals" must be a list of strings');
+
+        (new ConfigLoader())->load($this->directory);
+    }
 }
