@@ -245,4 +245,59 @@ final class ChainBuilderTest extends TestCase
         self::assertSame('aaa', $findings[0]->param);
         self::assertSame('bbb', $findings[1]->param);
     }
+
+    public function testParentDelegationScoresNeitherAHopNorAClass(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class Base { private ?\Throwable $p = null; '
+            . 'public function __construct(?\Throwable $previous = null) { $this->p = $previous; } } '
+            . 'class Sub extends Base { '
+            . 'public function __construct(?\Throwable $previous = null) { parent::__construct($previous); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\Sub::__construct', $finding->origin);
+        self::assertSame('Demo\Base::__construct', $finding->terminal);
+        self::assertSame(TerminalKind::Stored, $finding->terminalKind);
+        self::assertSame(0, $finding->hops);
+        self::assertSame(1, $finding->classes);
+        self::assertTrue($finding->chain[0]->viaParent);
+        self::assertFalse($finding->chain[1]->viaParent);
+    }
+
+    public function testCollaboratorHopAfterParentDelegationStillScores(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Base { public function __construct(Cfg $config) { (new Mailer())->send($config); } } '
+            . 'class Sub extends Base { public function __construct(Cfg $config) { parent::__construct($config); } } '
+            . 'class Mailer { private ?Cfg $c = null; '
+            . 'public function send(Cfg $config): void { $this->c = $config; } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\Sub::__construct', $finding->origin);
+        self::assertSame('Demo\Mailer::send', $finding->terminal);
+        self::assertSame(1, $finding->hops);
+        self::assertSame(2, $finding->classes);
+        self::assertCount(3, $finding->chain);
+    }
+
+    public function testSelfDelegationIsAnOrdinaryHop(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Service { '
+            . 'public function handle(Cfg $config): void { self::store($config); } '
+            . 'private static function store(Cfg $config): void { (new Sink())->keep($config); } } '
+            . 'class Sink { private ?Cfg $c = null; '
+            . 'public function keep(Cfg $config): void { $this->c = $config; } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+        self::assertSame(2, $findings[0]->hops);
+        self::assertSame(2, $findings[0]->classes);
+    }
 }

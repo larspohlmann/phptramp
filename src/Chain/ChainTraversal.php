@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Chain;
 
+use PhpTramp\Index\CalleeKind;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\MethodInfo;
@@ -117,10 +118,23 @@ final class ChainTraversal
                 $forward->line,
                 false,
                 $param->name,
+                $this->isParentDelegation($forward),
             );
             $advanced = $chain->append($hop, $this->traceLine($method->fqmn, $forward, $resolution), $key);
             $this->follow($resolution, $advanced);
         }
+    }
+
+    /**
+     * A `parent::` call hands the value to the same object's base class, not to
+     * a collaborator. Detected syntactically: php-parser's NameResolver leaves
+     * `parent` unresolved as a special class name, which is also why
+     * CallResolver matches the literal string.
+     */
+    private function isParentDelegation(ForwardSite $forward): bool
+    {
+        return $forward->callee->kind === CalleeKind::StaticCall
+            && $forward->callee->receiverHint === 'parent';
     }
 
     private function follow(Resolution $resolution, PartialChain $chain): void
@@ -205,12 +219,31 @@ final class ChainTraversal
             $chain->hops[0]->fqmn,
             $terminal->fqmn,
             $terminal->kind,
-            count($chain->hops),
+            $this->scoredHops($chain->hops),
             $fullChain,
             $this->distinctClasses($fullChain),
             $terminal->notes,
             $chain->trace,
         );
+    }
+
+    /**
+     * The hop score: forwarding nodes that handed the value to a collaborator.
+     * `parent::` delegators stay in the rendered chain but never score — they
+     * are the same object as the node they delegate into.
+     *
+     * @param list<Hop> $hops
+     */
+    private function scoredHops(array $hops): int
+    {
+        $scored = 0;
+        foreach ($hops as $hop) {
+            if (! $hop->viaParent) {
+                $scored++;
+            }
+        }
+
+        return $scored;
     }
 
     /**
@@ -220,7 +253,7 @@ final class ChainTraversal
     {
         $classes = [];
         foreach ($chain as $hop) {
-            if ($hop->class !== null) {
+            if ($hop->class !== null && ! $hop->viaParent) {
                 $classes[$hop->class] = true;
             }
         }
