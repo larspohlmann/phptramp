@@ -10,6 +10,10 @@ the git log and the merged pull requests.
 
 ## [Unreleased]
 
+## [v0.1.0] - 2026-08-14
+
+Initial release.
+
 ### Added
 - `--format pretty`: colored, file-grouped, line-sorted terminal output. New
   default when STDOUT is a TTY.
