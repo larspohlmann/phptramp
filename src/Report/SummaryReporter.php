@@ -33,6 +33,15 @@ final class SummaryReporter implements Reporter
      */
     public function render(array $findings): string
     {
+        // A 0-hop finding is `parent::` delegation: it never crossed a
+        // collaborator boundary, so it is not a chain and has no place in a
+        // "chains by length" overview — this filter, not a Thresholds call,
+        // is what keeps the "regardless of thresholds" promise meaningful.
+        $findings = array_values(array_filter(
+            $findings,
+            static fn (Finding $finding): bool => $finding->hops > 0,
+        ));
+
         if ($findings === []) {
             return "No chains found.\n";
         }

@@ -286,6 +286,25 @@ final class ChainBuilderTest extends TestCase
         self::assertCount(3, $finding->chain);
     }
 
+    public function testCollaboratorHopBeforeParentDelegationStillScores(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Caller { public function handle(Cfg $config): void { (new Sub())->accept($config); } } '
+            . 'class Base { private ?Cfg $c = null; '
+            . 'public function accept(Cfg $config): void { $this->c = $config; } } '
+            . 'class Sub extends Base { '
+            . 'public function accept(Cfg $config): void { parent::accept($config); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\Caller::handle', $finding->origin);
+        self::assertSame('Demo\Base::accept', $finding->terminal);
+        self::assertSame(1, $finding->hops);
+        self::assertSame(2, $finding->classes);
+    }
+
     public function testSelfDelegationIsAnOrdinaryHop(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '

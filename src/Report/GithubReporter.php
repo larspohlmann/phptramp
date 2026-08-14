@@ -101,10 +101,10 @@ final class GithubReporter implements Reporter
     }
 
     /**
-     * The chain index of the first hop marked `changed`, restricted to the
-     * non-terminal hops (0 .. hops-1). Falls back to the origin (index 0) when
-     * none is marked, which is the only case a normal (non diff-aware) run
-     * ever produces.
+     * The index of the first forwarding node marked `changed`, among the
+     * chain's non-terminal hops. Falls back to the origin (index 0) when none
+     * is marked, which is the only case a normal (non diff-aware) run ever
+     * produces.
      *
      * @param array<int, Hop> $nonTerminalHops
      */

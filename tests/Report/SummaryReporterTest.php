@@ -20,6 +20,34 @@ final class SummaryReporterTest extends TestCase
     }
 
     /**
+     * A 0-hop finding is pure `parent::` delegation, never a chain — it must
+     * be excluded from every block, including the totals footer, and an
+     * all-delegation input must still render the empty-findings message.
+     */
+    public function testZeroHopFindingsAreExcludedFromEveryBlock(): void
+    {
+        $delegation = $this->finding(
+            'previous',
+            0,
+            'Demo\Sub::__construct',
+            'Demo\Base::__construct',
+            TerminalKind::Stored,
+        );
+        $scoring = $this->finding('config', 1, 'Demo\A::go', 'Demo\Sink::x', TerminalKind::Used);
+
+        $output = (new SummaryReporter(new Thresholds(3, null)))->render([$delegation, $scoring]);
+
+        self::assertStringNotContainsString('0 hop', $output);
+        self::assertStringNotContainsString('Demo\Sub::__construct', $output);
+        self::assertStringContainsString('1 chain total', $output);
+
+        self::assertSame(
+            "No chains found.\n",
+            (new SummaryReporter(new Thresholds(3, null)))->render([$delegation]),
+        );
+    }
+
+    /**
      * Twelve findings across four hop lengths (1..4), exercising: ascending
      * hop-length bars, the Top-10 cap (one of three 1-hop findings is
      * excluded), the hops-desc/origin-asc/param-asc tiebreak (the two 4-hop

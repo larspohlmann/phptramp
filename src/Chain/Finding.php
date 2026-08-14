@@ -6,8 +6,9 @@ namespace PhpTramp\Chain;
 
 /**
  * One maximal tramp-data chain: a parameter forwarded, unused, from its origin
- * method to a terminal. `hops` counts the pure-forward nodes only (the terminal
- * is never counted); thresholding against `--limit` is the caller's job.
+ * method to a terminal. `hops` is the score: pure-forward nodes that are not
+ * `parent::` delegators (the terminal is never counted); thresholding against
+ * `--limit` is the caller's job.
  */
 final class Finding
 {
