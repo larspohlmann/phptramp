@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpTramp\Tests\Index;
 
+use PhpTramp\Index\ClassKind;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParseException;
@@ -51,10 +52,19 @@ final class IndexerTest extends TestCase
 
     private string $file = '';
 
+    /** @var list<string> */
+    private array $files = [];
+
     protected function tearDown(): void
     {
         if ($this->file !== '' && is_file($this->file)) {
             unlink($this->file);
+        }
+
+        foreach ($this->files as $file) {
+            if (is_file($file)) {
+                unlink($file);
+            }
         }
     }
 
@@ -64,6 +74,31 @@ final class IndexerTest extends TestCase
         file_put_contents($this->file, $code);
 
         return (new Indexer())->index([$this->file]);
+    }
+
+    private function writeFile(string $code): string
+    {
+        $file = tempnam(sys_get_temp_dir(), 'phptramp') . '.php';
+        file_put_contents($file, $code);
+        $this->files[] = $file;
+
+        return $file;
+    }
+
+    /**
+     * @return array{MethodIndex, string, string}
+     */
+    private function indexFiles(string $codeA, string $codeB): array
+    {
+        $fileA = $this->writeFile($codeA);
+        $fileB = $this->writeFile($codeB);
+
+        return [(new Indexer())->index([$fileA, $fileB]), $fileA, $fileB];
+    }
+
+    private function lineOf(string $code, string $marker): int
+    {
+        return substr_count(substr($code, 0, strpos($code, $marker)), "\n") + 1;
     }
 
     public function testIndexesMethodsFunctionsAndTraitMethods(): void
@@ -129,6 +164,44 @@ final class IndexerTest extends TestCase
         self::assertSame(['Demo\Logs'], $service->traits);
     }
 
+    public function testRecordsClassKindForEveryDeclarationShape(): void
+    {
+        $code = <<<'PHP'
+            <?php
+
+            namespace Demo;
+
+            class Concrete
+            {
+            }
+
+            abstract class Abstracted
+            {
+            }
+
+            interface Contract
+            {
+            }
+
+            trait Helper
+            {
+            }
+
+            enum Suit
+            {
+                case Hearts;
+            }
+            PHP;
+
+        $index = $this->index($code);
+
+        self::assertSame(ClassKind::ConcreteClass, $index->classInfo('Demo\Concrete')?->kind);
+        self::assertSame(ClassKind::AbstractClass, $index->classInfo('Demo\Abstracted')?->kind);
+        self::assertSame(ClassKind::Interface_, $index->classInfo('Demo\Contract')?->kind);
+        self::assertSame(ClassKind::Trait_, $index->classInfo('Demo\Helper')?->kind);
+        self::assertSame(ClassKind::Enum_, $index->classInfo('Demo\Suit')?->kind);
+    }
+
     public function testParseErrorThrowsParseException(): void
     {
         $this->expectException(ParseException::class);
@@ -143,6 +216,91 @@ final class IndexerTest extends TestCase
         } catch (ParseException $e) {
             self::assertStringContainsString('parse errors', $e->getMessage());
             self::assertStringContainsString($this->file, $e->getMessage());
+        }
+    }
+
+    public function testMergesMethodsAndClassesFromMultipleFiles(): void
+    {
+        $codeA = <<<'PHP'
+            <?php
+
+            namespace DemoA;
+
+            class ServiceA
+            {
+                public function handle(): void
+                {
+                }
+            }
+            PHP;
+        $codeB = <<<'PHP'
+            <?php
+
+            namespace DemoB;
+
+            class ServiceB
+            {
+                public function run(): void
+                {
+                }
+            }
+            PHP;
+
+        [$index] = $this->indexFiles($codeA, $codeB);
+
+        self::assertNotNull($index->get('DemoA\ServiceA::handle'));
+        self::assertNotNull($index->get('DemoB\ServiceB::run'));
+        self::assertNotNull($index->classInfo('DemoA\ServiceA'));
+        self::assertNotNull($index->classInfo('DemoB\ServiceB'));
+    }
+
+    public function testMergesSuppressedLinesFromMultipleFiles(): void
+    {
+        $codeA = <<<'PHP'
+            <?php
+
+            namespace DemoA;
+
+            class ServiceA
+            {
+                public function run(): void
+                {
+                    // phptramp-ignore
+                }
+            }
+            PHP;
+        $codeB = <<<'PHP'
+            <?php
+
+            namespace DemoB;
+
+            class ServiceB
+            {
+                public function run(): void
+                {
+                    // phptramp-ignore
+                }
+            }
+            PHP;
+
+        [$index, $fileA, $fileB] = $this->indexFiles($codeA, $codeB);
+        $suppressions = $index->suppressions();
+
+        self::assertTrue($suppressions->suppressesLine($fileA, $this->lineOf($codeA, '// phptramp-ignore')));
+        self::assertTrue($suppressions->suppressesLine($fileB, $this->lineOf($codeB, '// phptramp-ignore')));
+    }
+
+    public function testParseErrorAggregatesMessagesFromAllBadFiles(): void
+    {
+        $fileA = $this->writeFile("<?php class BrokenA {");
+        $fileB = $this->writeFile("<?php class BrokenB {");
+
+        try {
+            (new Indexer())->index([$fileA, $fileB]);
+            self::fail('expected ParseException');
+        } catch (ParseException $e) {
+            self::assertStringContainsString($fileA, $e->getMessage());
+            self::assertStringContainsString($fileB, $e->getMessage());
         }
     }
 }

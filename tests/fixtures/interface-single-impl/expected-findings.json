@@ -1,0 +1,21 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\Controller::run",
+            "terminal": "Demo\\RealHandler::handle",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\Controller::run", "role": "origin", "file": "src/Demo.php", "line": 24, "forwardLine": 26},
+                {"method": "Demo\\RealHandler::handle", "role": "terminal", "file": "src/Demo.php", "line": 16, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\Controller::handle",
+            "terminal": "Demo\\Service::process",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\Controller::handle", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\Service::process", "role": "terminal", "file": "src/Demo.php", "line": 19, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

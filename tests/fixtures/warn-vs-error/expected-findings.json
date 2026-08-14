@@ -1,0 +1,38 @@
+{
+    "limit": 3,
+    "warnLimit": 2,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "warning",
+            "origin": "Demo\\TwoHopOrigin::run",
+            "terminal": "Demo\\TwoHopTerminal::consume",
+            "terminalKind": "used",
+            "hops": 2,
+            "classes": 3,
+            "chain": [
+                {"method": "Demo\\TwoHopOrigin::run", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\TwoHopMiddle::relay", "role": "hop", "file": "src/Demo.php", "line": 19, "forwardLine": 21},
+                {"method": "Demo\\TwoHopTerminal::consume", "role": "terminal", "file": "src/Demo.php", "line": 27, "forwardLine": null}
+            ],
+            "notes": []
+        },
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\ThreeHopOrigin::run",
+            "terminal": "Demo\\ThreeHopTerminal::consume",
+            "terminalKind": "used",
+            "hops": 3,
+            "classes": 4,
+            "chain": [
+                {"method": "Demo\\ThreeHopOrigin::run", "role": "origin", "file": "src/Demo.php", "line": 35, "forwardLine": 37},
+                {"method": "Demo\\ThreeHopMiddleA::relay", "role": "hop", "file": "src/Demo.php", "line": 43, "forwardLine": 45},
+                {"method": "Demo\\ThreeHopMiddleB::relay", "role": "hop", "file": "src/Demo.php", "line": 51, "forwardLine": 53},
+                {"method": "Demo\\ThreeHopTerminal::consume", "role": "terminal", "file": "src/Demo.php", "line": 59, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

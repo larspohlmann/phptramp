@@ -25,7 +25,7 @@ filters, not analysis shortcuts (chains cross files).
 
 ## Global Constraints
 
-- Package `larspohlmann/phptramp`, MIT, binary `vendor/bin/phptramp`, runtime PHP `>=8.2`.
+- Package `phptramp/phptramp`, MIT, binary `vendor/bin/phptramp`, runtime PHP `>=8.2`.
 - Only production dependency: `nikic/php-parser ^5`. No symfony/console — a hand-rolled
   `ArgvParser` keeps the tool conflict-free as a `require-dev` install.
 - Exit codes: `0` = no findings ≥ limit, `1` = findings ≥ limit, `2` = tool error.
@@ -86,8 +86,22 @@ implementation. Every bullet is a fixture.
 3. **Constructor storage is use.** `$this->x = $p` (incl. promoted properties) ends the
    chain at the constructor. "Field tramping" through properties is future work, not v0.1.
 4. **Threshold metric:** number of pure-forward methods in the chain (origin included if
-   it purely forwards; terminal never counted). Report when hops ≥ `--limit` (default 3).
-   Classes traversed is supplementary output, never the threshold.
+   it purely forwards; terminal never counted). A node that forwards on through
+   `parent::` is excluded from the hop count: it delegates to
+   the same object's base, so it is inheritance wiring rather than a value crossing a
+   collaborator boundary (issue #19). It is excluded from the class count too, but only
+   when that base is itself in the chain and therefore stands in for it; a `parent::`
+   node that *ends* the chain because its base sits outside the analyzed index (e.g.
+   `extends \RuntimeException`) has no stand-in, so its class is counted — the value
+   really did cross into it. `self::`/`static::` are unaffected — same class,
+   ordinary hop. Report when hops ≥ `--limit` (default 6 since v0.1.x; was 3 in the
+   initial design review, raised after real-world use showed 3-hop chains are too
+   common to gate by default). `--warn-limit` (default 4) adds a warning tier below the
+   limit. `--min-classes <n>` (default 0 = off) suppresses chains traversing fewer than
+   `n` distinct classes. `--exclude-terminal <kind>` (repeatable, default: none) drops
+   findings whose chain ends in a given `TerminalKind`; it filters, it does not
+   re-score. `0` on either threshold disables that tier. Classes traversed is
+   supplementary output, never the primary threshold, but can gate via `--min-classes`.
 5. **Call resolution (v0.1):** plain functions, `self::`/`static::`/`ClassName::`
    statics, `$this->m()`, calls on values with a single declared class type (params,
    typed properties, `new X`), constructors, trait methods (through `use`), named
@@ -105,12 +119,16 @@ implementation. Every bullet is a fixture.
 9. **Diff-aware mode:** any-hop intersection at changed-**line** granularity. A chain is
    reported iff at least one hop's signature line or forwarding call-site line falls in
    the diff. Intersecting hops are marked in output ("this hop is yours").
-10. **Baseline fingerprint:** `sha1(originFQMN + "\0" + paramName + "\0" + terminalFQMN)`
-    — deliberately excludes line numbers and intermediate hops so refactors don't churn
-    the baseline.
+10. **Baseline fingerprint:** `sha1(originFQMN + "\0" + paramName + "\0" + terminalToken)`
+     — deliberately excludes line numbers and intermediate hops so refactors don't churn
+     the baseline. The terminal component is the terminal FQMN when the chain has one,
+     else the `TerminalKind` backing value (`external` / `truncated`) — NOT a per-reason
+     category. Coarser is deliberate: a chain whose truncation reason changes when
+     resolution improves stays baselined; re-opening grandfathered findings on
+     analyzer upgrades would destroy trust in the baseline.
 11. **Suppression:** `#[TrampIgnore]` attribute (on method or parameter) and
     `// phptramp-ignore` line comment; a chain is suppressed if any hop is suppressed.
-    Stale suppressions and stale baseline entries are reported (Phase 5).
+    Stale suppressions and stale baseline entries are reported (Phase 5 — shipped).
 
 ---
 
@@ -215,10 +233,12 @@ testable, and debuggable before any chain logic exists.
   it, prints the message to stderr, exits 2.
   `Options` readonly properties: `list<string> $folders = []`,
   `list<string> $files = []`, `int $limit = 3`, `?int $warnLimit = null`,
-  `string $format = 'text'`, `bool $explain = false`, `bool $changedOnly = false`,
+  `string $format = 'pretty'`, `bool $explain = false`, `bool $changedOnly = false`,
   `string $gitBase = 'origin/main'`, `?string $baseline = null`,
   `?string $generateBaseline = null`, `bool $dumpIndex = false`,
-  `bool $help = false`, `bool $version = false`.
+  `bool $help = false`, `bool $version = false`. (Default flipped from `text`
+  to `pretty` in Phase 3; `Application` downgrades `pretty` → `text` on
+  non-TTY STDOUT when `--color=auto`, so pipes/CI stay plain.)
 
 - [x] **Step 1: Write the failing tests** (`tests/Console/ArgvParserTest.php`):
 
@@ -248,7 +268,7 @@ final class ArgvParserTest extends TestCase
         self::assertSame([], $o->files);
         self::assertSame(3, $o->limit);
         self::assertNull($o->warnLimit);
-        self::assertSame('text', $o->format);
+        self::assertSame('pretty', $o->format);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
         self::assertSame('origin/main', $o->gitBase);
@@ -607,11 +627,16 @@ class Mailer
 
 ---
 
-## Phase 2 — Chain stitching → *usable tool*
+## Phase 2 — Chain stitching → *usable tool*  ✅ (issue #3)
 
 **Deliverable:** `phptramp --folder src --limit 3` prints text findings, exits 0/1/2.
 
-Tasks (expand to steps in `docs/plans/phase-2.md` before starting):
+**Detailed step-by-step plan: [docs/plans/phase-2.md](plans/phase-2.md)** — written
+against the actual Phase 1 interfaces; where it refines the task sketches below
+(e.g. `ClassKind`, `storedOnly`, `Resolution` as an interface with three
+implementations), the detailed plan wins.
+
+Tasks (expanded in `docs/plans/phase-2.md`):
 
 - **2.1 ClassHierarchy:** flatten traits into classes; map interface/abstract →
   concrete implementations across the whole index; expose
@@ -655,7 +680,11 @@ Tasks (expand to steps in `docs/plans/phase-2.md` before starting):
   3. **Branching:** every outgoing edge is explored; each root-to-terminal path is its
      own Finding. A param forwarded to two callees therefore yields two findings —
      they share the origin but differ in terminal, which is what the baseline
-     fingerprint keys on.
+     fingerprint keys on. A param forwarded to the same callee via multiple call
+     sites within one method yields one Finding per call site; they share origin,
+     param, and terminal and differ only in the divergent hop's `forwardLine`,
+     which every reporter surfaces. They share a fingerprint (the fingerprint
+     excludes lines by design).
   4. **Terminals:** child fate `Used` → terminal kind `used` (or `stored` when the
      body is a single property assignment); `ByRefTerminated` → `&-terminated`;
      `Unused` → `unused-end` (dead forwarding — the value goes nowhere); leaf from
@@ -675,75 +704,119 @@ Tasks (expand to steps in `docs/plans/phase-2.md` before starting):
 
 ---
 
-## Phase 3 — CI & config surface
+## Phase 3 — CI & config surface  ✅ (issue #5)
 
 **Deliverable:** all output formats, config file, suppression, dual thresholds, summary.
 
-- **3.1 ConfigLoader:** `phptramp.json` then `phptramp.dist.json`; keys `paths`,
+**Detailed step-by-step plan: [docs/plans/phase-3.md](plans/phase-3.md)** — written
+against the actual Phase 1–2 interfaces; where it refines the sketches below (e.g.
+`Severity`/`Thresholds` as reporting-layer concepts, config precedence via
+parser-default seeding, suppression exposed through `MethodIndex::suppressions()`),
+the detailed plan wins.
+
+- [x] **3.1 ConfigLoader:** `phptramp.json` then `phptramp.dist.json`; keys `paths`,
   `exclude`, `limit`, `warnLimit`, `format`, `baseline`; strict unknown-key error;
   precedence CLI > config > defaults (merge into `Options`). `exclude` glob patterns
   feed FileLocator.
-- **3.2 Formats:** `JsonReporter` (the `expected.json` schema — one schema everywhere),
+- [x] **3.2 Formats:** `JsonReporter` (the `expected.json` schema — one schema everywhere),
   `GithubReporter` (`::error file=...,line=...::...` per origin, `::notice` per hop),
   `CheckstyleReporter`, `SarifReporter` (rule id `phptramp.trampData`). Fixtures assert
   each format byte-for-byte.
-- **3.3 Suppression:** `#[TrampIgnore]` attribute class + `// phptramp-ignore` comments
+- [x] **3.3 Suppression:** `#[TrampIgnore]` attribute class + `// phptramp-ignore` comments
   scanned during indexing into a `SuppressionIndex`; ChainBuilder drops chains with any
   suppressed hop (frozen rule 11).
-- **3.4 Dual thresholds:** `--warn-limit` — findings in `[warn, limit)` render as
+- [x] **3.4 Dual thresholds:** `--warn-limit` — findings in `[warn, limit)` render as
   warnings, never affect exit code. GitHub format uses `::warning`.
-- **3.5 SummaryReporter:** `--format=summary` — histogram of chain lengths, top 10
+- [x] **3.5 SummaryReporter:** `--format=summary` — histogram of chain lengths, top 10
   longest chains, most-forwarded parameters.
+
+`--changed-only`/`--git-base`/`--diff` were, at this point, accepted-but-inert CLI
+flags — parsed into `Options` for forward compatibility, not yet consumed by
+analysis; Phase 4 below wires them up. `--baseline`/`--generate-baseline` remain
+accepted-but-inert pending Phase 5.
 
 ---
 
-## Phase 4 — Diff-aware mode (flagship)
+## Phase 4 — Diff-aware mode (flagship)  ✅ (issue #7)
 
 **Deliverable:** `phptramp --changed-only --git-base origin/main` reports only chains
 intersecting the diff and marks which hops are the user's.
 
-- **4.1 DiffParser + ChangedLines:** parse unified diff from stdin (`--changed-only -`)
+**Detailed step-by-step plan: [docs/plans/phase-4.md](plans/phase-4.md)** — written
+against the shipped Phase 1–3 interfaces; where it refines the sketches below
+(diff via `--diff <path|->` instead of a positional `-`, a `--no-config` escape
+hatch, marking via immutable Finding rebuild), the detailed plan wins. Two items
+are pulled forward into this phase at the maintainer's request, both shipped here
+rather than in Phase 6: the repo's own `composer tramp` script + `phptramp.dist.json`,
+and the CI dogfood step becoming a real gate (limit 3, warn-limit 2 — thresholds
+measured on the actual tree).
+
+- [x] **4.1 DiffParser + ChangedLines:** parse unified diff from stdin (`--changed-only -`)
   or by executing `git diff --unified=0 <base>...HEAD` (note: three-dot, merge-base
   semantics, matching CI expectations); produce `file -> set<line>` of *added/modified*
   lines, realpath-normalized.
-- **4.2 Intersection filter:** frozen rule 9 — hop matches if its declaration line or
+- [x] **4.2 Intersection filter:** frozen rule 9 — hop matches if its declaration line or
   its forwarding call-site line ∈ changed lines of its file. Chain reported iff ≥ 1 hop
   matches.
-- **4.3 Hop marking:** `Hop::isChanged` flows into every reporter; text renders
+- [x] **4.3 Hop marking:** `Hop::isChanged` flows into every reporter; text renders
   `hop 2  *YOURS*`, json gets `"changed": true`, github annotates changed hops as the
   error location — the "your edit made this chain longer" experience.
-- **4.4 CI cookbook page:** `docs/ci.md` with copy-paste GitHub Actions and GitLab
+- [x] **4.4 CI cookbook page:** `docs/ci.md` with copy-paste GitHub Actions and GitLab
   snippets for PR-only gating.
 
 ---
 
-## Phase 5 — Baseline
+## Phase 5 — Baseline  ✅ (complete — issue #9)
 
-- **5.1 Fingerprint:** frozen rule 10, exact bytes:
-  `sha1(origin . "\0" . param . "\0" . terminal)`. Truncated chains use
-  `truncated:<reason-category>` as terminal so resolution improvements don't silently
-  re-open baselined findings with a different reason string.
-- **5.2 Generate/consume:** `--generate-baseline phptramp-baseline.json` (sorted, one
+**Detailed step-by-step plan: [docs/plans/phase-5.md](plans/phase-5.md)** — written
+against the shipped Phase 1–4 interfaces; where it refines the sketches below
+(fingerprint terminal token = terminal FQMN or the TerminalKind value rather than
+a per-reason category; suppression refactored into a fired-tracking filter so
+stale ignores are detectable; stale detection skipped under `--changed-only`),
+the detailed plan wins.
+
+- [x] **5.1 Fingerprint:** frozen rule 10, exact bytes:
+  `sha1(origin . "\0" . param . "\0" . terminal)`. The terminal token is the
+  terminal FQMN when the chain resolves one, else the `TerminalKind` backing
+  value (`external` / `truncated`) — NOT a per-reason category — so resolution
+  improvements don't silently re-open baselined findings with a different
+  reason string.
+- [x] **5.2 Generate/consume:** `--generate-baseline phptramp-baseline.json` (sorted, one
   fingerprint per line-ish JSON for clean diffs); `--baseline` / config `baseline` key
   filters findings before exit-code computation.
-- **5.3 Stale detection:** baseline entries matching nothing and `#[TrampIgnore]`
+- [x] **5.3 Stale detection:** baseline entries matching nothing and `#[TrampIgnore]`
   suppressing nothing → warnings (never exit 1 by default; `--fail-on-stale` opts in).
+  Stale detection is skipped entirely under `--changed-only` (full runs only).
 
 ---
 
-## Phase 6 — Performance & release
+## Phase 6 — Performance & release  (Tasks 1–5 done on this branch; release follows merge — issue #11)
 
-- **6.1 Index cache:** per-file serialized `MethodInfo[]` keyed by (path, mtime, size,
-  tool version) under `.phptramp.cache/`; `--no-cache` flag. Target: warm re-run on a
-  50k-LOC codebase < 1s (this is what makes IDE per-save invocation viable).
-- **6.2 Parallel indexing:** worker pool via `proc_open` of self with a hidden
-  `--worker` mode over file shards (no pcntl dependency — works on Windows CI). Decide
-  worker count from `nproc`, flag `--jobs`.
-- **6.3 Docs:** PhpStorm External Tool + File Watcher recipe (`docs/phpstorm.md`),
-  finalize `docs/ci.md`, README rewrite against the real tool output.
-- **6.4 Release:** dogfood job gating (`--limit 3`, real), Packagist submission, tag
-  `v0.1.0`. Roadmap notes (explicit maybe-laters): `--follow-all-implementations`,
-  field/property tramping, native PhpStorm plugin, composer-plugin command package.
+**Detailed step-by-step plan: [docs/plans/phase-6.md](plans/phase-6.md)** — written
+against the shipped Phase 1–5 interfaces; where it refines the sketches below, the
+detailed plan wins. Tasks 1–5 (index cache, `--no-cache` + `cache` config key,
+PhpStorm recipe, docs release pass, this roadmap close-out) land on
+`feature/11-cache-and-release`; the v0.1.0 release (Task 6) follows the merge via the
+git-flow release process described in `CLAUDE.md` — not on this branch.
+
+- [x] **6.1 Index cache:** per-file serialized `MethodInfo[]` keyed by (path, mtime,
+  size, tool version) under `.phptramp.cache/`; `--no-cache` flag and `cache` config key.
+  Measured on `--folder vendor` (4,610 files / 601,867 lines): cold ≈ 19.6s → warm total
+  ≈ 4.5s with indexing ≈ 0 (all cache hits; the residual is chain-resolution + reporting).
+  Target was warm re-run on a 50k-LOC codebase < 1s — met, and IDE per-save invocation is
+  viable on the warm path.
+- **6.2 Parallel indexing:** deferred — **the data said no, not yet.** Measured cold
+  indexing is ≈ 19.6s for the 600k-LOC vendor tree (≈ 1.6s per 50k LOC), and warm
+  indexing with the 6.1 cache is ≈ 0 (all hits), so the per-file cache alone meets the
+  stated warm-run target; the `proc_open`-of-self worker pool (no pcntl dependency,
+  Windows-CI-friendly) is moved to the post-v0.1 roadmap with the measurement recorded.
+- [x] **6.3 Docs:** PhpStorm External Tool + File Watcher recipe shipped at
+  `docs/phpstorm.md`; `docs/ci.md` finalized and README release pass done against the
+  real tool output.
+- **6.4 Release:** (dogfood gating shipped early, in Phase 4) Packagist submission, tag
+  `v0.1.0` — follows the merge of this branch into `develop` via the git-flow release
+  process (see `CLAUDE.md`); not performed on this branch. The explicit maybe-laters
+  (roadmap notes) move to the `## Post-v0.1 roadmap` section below.
 
 ---
 
@@ -753,6 +826,31 @@ intersecting the diff and marks which hops are the user's.
 2. `composer check` (cs + stan + md + test) green, tests green on 8.2/8.3/8.4 matrix.
 3. Help text (`Application::helpText`), README, and this plan agree with actual flags.
 4. No placeholder output ("TODO", "not implemented") reachable from shipped flags.
+
+---
+
+## Post-v0.1 roadmap
+
+Explicit maybe-laters recorded during Phases 0–6; each waits on a concrete consumer
+ask unless the measurement already says "not yet".
+
+- **`--follow-all-implementations`:** follow all N implementations of an interface
+  instead of the single-implementation default — fan-out counts are already recorded
+  since Phase 2 (see the single-implementation follow-through bullet in the Appendix),
+  so this is a small flag, not a rewrite. Origin: Phase 2 frozen-semantics decision.
+- **Field/property tramping:** constructor-stored values re-forwarded via properties
+  (the parameter is captured, not just passed). Today the classifier tracks parameter
+  forwarding, not property-mediated re-forwarding. Origin: Phase 0 "future work" note.
+- **Native PhpStorm plugin:** inline squiggles in the editor. The External Tool / File
+  Watcher recipe in `docs/phpstorm.md` is the stopgap. Origin: Phase 6.3 docs stopgap.
+- **Composer-plugin command package:** `composer tramp` without the per-project
+  script snippet. Origin: Option B from the Phase 0 design review.
+- **Parallel indexing:** the deferred 6.2 worker pool (`proc_open`-of-self over file
+  shards, `--jobs`). The measurement — cold ≈ 19.6s for the 600k-LOC vendor tree,
+  warm indexing ≈ 0 with the 6.1 cache — shows the cache alone meets the target, so
+  this is "the data said no, not yet", not descoped. Origin: Phase 6.2 deferral.
+- **`--fail-on-stale` config key:** CLI-only since Phase 5; add a `failOnStale` config
+  key on demand when a consumer asks for it. Origin: Phase 5.3 stale-detection design.
 
 ---
 
@@ -807,3 +905,10 @@ instead of guessing.
   are the one thing PHPStan max + PSR-12 don't cover), and diff-scoped Infection were
   adopted from the maintainer's simple-feed-reader project, including its hard-won
   CI comments (PR-only mutation, `--ignore-msi-with-no-mutations`, PCOV).
+- **`stored` terminals stay findings by default:** issue #19 proposed that a
+  chain ending by handing the value to a constructor or value object should not
+  be a finding. Rejected as a *default*: the README's own headline finding is a
+  `stored` terminal, as are 7 of the 21 findings across `tests/fixtures/`. The
+  issue's noisy example (2 hops across 2 classes) and the README's legitimate
+  one (3 hops across 4 classes) are both `stored`, so terminal kind is not what
+  separates them — hop count is. Exposed as opt-in `--exclude-terminal` instead.

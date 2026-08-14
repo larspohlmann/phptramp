@@ -38,6 +38,9 @@ jobs:
         run: composer stan
       - name: PHPMD (codesize)
         run: composer md
+      # Dogfood: phptramp gates itself via its own config (limit 6, warn-limit 4).
+      - name: Dogfood
+        run: composer tramp
 
   # Line coverage says a line ran; it does not say a test would notice if the
   # line were wrong. Infection changes the line and reports whether anything

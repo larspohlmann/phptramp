@@ -21,14 +21,18 @@ final class ArgvParserTest extends TestCase
         $o = $this->parse();
         self::assertSame([], $o->folders);
         self::assertSame([], $o->files);
-        self::assertSame(3, $o->limit);
-        self::assertNull($o->warnLimit);
-        self::assertSame('text', $o->format);
+        self::assertSame(6, $o->limit);
+        self::assertSame(4, $o->warnLimit);
+        self::assertSame(0, $o->minClasses);
+        self::assertSame('pretty', $o->format);
+        self::assertSame('auto', $o->colorMode);
         self::assertFalse($o->explain);
         self::assertFalse($o->changedOnly);
         self::assertSame('origin/main', $o->gitBase);
+        self::assertNull($o->diff);
         self::assertNull($o->baseline);
         self::assertFalse($o->dumpIndex);
+        self::assertFalse($o->failOnStale);
     }
 
     public function testFolderAccumulates(): void
@@ -95,7 +99,7 @@ final class ArgvParserTest extends TestCase
      */
     public static function validFormatProvider(): iterable
     {
-        foreach (['text', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
+        foreach (['text', 'pretty', 'json', 'github', 'checkstyle', 'sarif', 'summary'] as $format) {
             yield $format => [$format];
         }
     }
@@ -109,6 +113,28 @@ final class ArgvParserTest extends TestCase
     public function testGitBaseParsed(): void
     {
         self::assertSame('develop', $this->parse('--git-base', 'develop')->gitBase);
+    }
+
+    public function testDiffSetsValueAndForcesChangedOnly(): void
+    {
+        $options = $this->parse('--diff', 'x.patch');
+
+        self::assertSame('x.patch', $options->diff);
+        self::assertTrue($options->changedOnly);
+    }
+
+    public function testDiffEqualsSyntaxWorks(): void
+    {
+        $options = $this->parse('--diff=x.patch');
+
+        self::assertSame('x.patch', $options->diff);
+        self::assertTrue($options->changedOnly);
+    }
+
+    public function testDiffWithoutValueThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--diff');
     }
 
     public function testBaselineParsed(): void
@@ -131,9 +157,44 @@ final class ArgvParserTest extends TestCase
         self::assertTrue($this->parse('--changed-only')->changedOnly);
     }
 
+    public function testFailOnStaleFlag(): void
+    {
+        self::assertTrue($this->parse('--fail-on-stale')->failOnStale);
+    }
+
+    public function testFailOnStaleDefaultsToFalse(): void
+    {
+        self::assertFalse($this->parse()->failOnStale);
+    }
+
     public function testDumpIndexFlag(): void
     {
         self::assertTrue($this->parse('--dump-index')->dumpIndex);
+    }
+
+    public function testNoConfigFlagSetsNoConfig(): void
+    {
+        self::assertTrue($this->parse('--no-config')->noConfig);
+    }
+
+    public function testNoConfigDefaultsToFalse(): void
+    {
+        self::assertFalse($this->parse()->noConfig);
+    }
+
+    public function testNoCacheFlagSetsNoCache(): void
+    {
+        self::assertTrue($this->parse('--no-cache')->noCache);
+    }
+
+    public function testNoCacheDefaultsToFalse(): void
+    {
+        self::assertFalse($this->parse()->noCache);
+    }
+
+    public function testCacheDirDefaultsToPhpTrampCache(): void
+    {
+        self::assertSame('.phptramp.cache', $this->parse()->cacheDir);
     }
 
     public function testHelpFlags(): void
@@ -172,5 +233,163 @@ final class ArgvParserTest extends TestCase
         } catch (InvalidArgsException $e) {
             self::assertStringContainsString('--limit', $e->getMessage());
         }
+    }
+
+    public function testSeededDefaultSurvivesWhenFlagAbsent(): void
+    {
+        $defaults = new Options(limit: 1);
+
+        self::assertSame(1, (new ArgvParser())->parse([], $defaults)->limit);
+    }
+
+    public function testExplicitFlagOverridesSeededDefault(): void
+    {
+        $defaults = new Options(limit: 1);
+
+        self::assertSame(5, (new ArgvParser())->parse(['--limit', '5'], $defaults)->limit);
+    }
+
+    public function testFirstPathFlagClearsSeededPaths(): void
+    {
+        $defaults = new Options(folders: ['configdir'], files: ['configfile.php']);
+
+        $options = (new ArgvParser())->parse(['--folder', 'cli'], $defaults);
+
+        self::assertSame(['cli'], $options->folders);
+        self::assertSame([], $options->files);
+    }
+
+    public function testSecondPathFlagAppendsRatherThanClearing(): void
+    {
+        $defaults = new Options(folders: ['configdir']);
+
+        $options = (new ArgvParser())->parse(['--folder', 'a', '--folder', 'b'], $defaults);
+
+        self::assertSame(['a', 'b'], $options->folders);
+    }
+
+    public function testFileFlagClearsSeededPaths(): void
+    {
+        $defaults = new Options(folders: ['configdir'], files: ['configfile.php']);
+
+        $options = (new ArgvParser())->parse(['--file', 'cli.php'], $defaults);
+
+        self::assertSame([], $options->folders);
+        self::assertSame(['cli.php'], $options->files);
+    }
+
+    public function testFilesFlagClearsSeededPaths(): void
+    {
+        $defaults = new Options(folders: ['configdir'], files: ['configfile.php']);
+
+        $options = (new ArgvParser())->parse(['--files', 'a.php,b.php'], $defaults);
+
+        self::assertSame([], $options->folders);
+        self::assertSame(['a.php', 'b.php'], $options->files);
+    }
+
+    public function testUnknownFlagWithEqualsSyntaxThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--nope=value');
+    }
+
+    public function testSeededExcludeSurvivesWhenAbsentFromArgv(): void
+    {
+        $defaults = new Options(exclude: ['vendor/*']);
+
+        self::assertSame(['vendor/*'], (new ArgvParser())->parse([], $defaults)->exclude);
+    }
+
+    public function testMinClassesParsed(): void
+    {
+        self::assertSame(4, $this->parse('--min-classes', '4')->minClasses);
+    }
+
+    public function testMinClassesEqualsSyntaxWorks(): void
+    {
+        self::assertSame(3, $this->parse('--min-classes=3')->minClasses);
+    }
+
+    public function testMinClassesDefaultsToZero(): void
+    {
+        self::assertSame(0, $this->parse()->minClasses);
+    }
+
+    public function testNonNumericMinClassesThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--min-classes', 'x');
+    }
+
+    public function testSeededNonPathDefaultsSurviveAlongsideExplicitFlags(): void
+    {
+        $defaults = new Options(format: 'json', gitBase: 'develop');
+
+        $options = (new ArgvParser())->parse(['--limit', '5'], $defaults);
+
+        self::assertSame('json', $options->format);
+        self::assertSame('develop', $options->gitBase);
+        self::assertSame(5, $options->limit);
+    }
+
+    public function testColorModeDefaultsToAuto(): void
+    {
+        self::assertSame('auto', $this->parse()->colorMode);
+    }
+
+    public function testColorAlwaysParsed(): void
+    {
+        self::assertSame('always', $this->parse('--color', 'always')->colorMode);
+    }
+
+    public function testColorEqualsSyntaxWorks(): void
+    {
+        self::assertSame('never', $this->parse('--color=never')->colorMode);
+    }
+
+    public function testUnknownColorModeThrows(): void
+    {
+        $this->expectException(InvalidArgsException::class);
+        $this->parse('--color', 'purple');
+    }
+
+    public function testUnknownColorModeMessageNamesTheValue(): void
+    {
+        try {
+            $this->parse('--color', 'purple');
+            self::fail('expected InvalidArgsException');
+        } catch (InvalidArgsException $e) {
+            self::assertStringContainsString('purple', $e->getMessage());
+        }
+    }
+
+    public function testExcludeTerminalIsRepeatable(): void
+    {
+        $options = (new ArgvParser())->parse(
+            ['--folder', 'src', '--exclude-terminal', 'stored', '--exclude-terminal=unused-end'],
+        );
+
+        self::assertSame(['stored', 'unused-end'], $options->excludeTerminals);
+    }
+
+    public function testExcludeTerminalDefaultsToEmpty(): void
+    {
+        self::assertSame([], (new ArgvParser())->parse(['--folder', 'src'])->excludeTerminals);
+    }
+
+    /**
+     * Unlike paths (where the first CLI --folder replaces config-seeded
+     * paths, {@see testFirstPathFlagClearsSeededPaths}), --exclude-terminal
+     * unions with a config-seeded excludeTerminals: a project-level policy
+     * list that a CI run can only add to, never silently drop from.
+     */
+    public function testExcludeTerminalUnionsWithSeededDefault(): void
+    {
+        $defaults = new Options(excludeTerminals: ['stored']);
+
+        $options = (new ArgvParser())->parse(['--exclude-terminal', 'external'], $defaults);
+
+        self::assertSame(['stored', 'external'], $options->excludeTerminals);
     }
 }

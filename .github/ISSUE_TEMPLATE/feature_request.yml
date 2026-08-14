@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a new capability or option
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that phptramp doesn't support today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should phptramp do, ideally with an example invocation and output.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Note: the core analysis semantics are frozen in
+        [docs/plan.md](https://github.com/larspohlmann/phptramp/blob/develop/docs/plan.md),
+        and when a case is ambiguous phptramp deliberately picks the conservative
+        option (fewer findings). Auto-fixing and second production dependencies
+        are documented non-goals.

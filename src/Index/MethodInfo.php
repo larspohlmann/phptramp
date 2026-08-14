@@ -21,4 +21,15 @@ final class MethodInfo
         public readonly ?string $class = null,
     ) {
     }
+
+    public function paramNamed(string $name): ?ParamInfo
+    {
+        foreach ($this->params as $param) {
+            if ($param->name === $name) {
+                return $param;
+            }
+        }
+
+        return null;
+    }
 }

@@ -1,0 +1,6 @@
+{
+    "paths": ["src"],
+    "limit": 6,
+    "warnLimit": 4,
+    "colorMode": "auto"
+}

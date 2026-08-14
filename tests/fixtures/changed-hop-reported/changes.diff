@@ -1,0 +1,5 @@
+--- a/tests/fixtures/changed-hop-reported/src/Demo.php
++++ b/tests/fixtures/changed-hop-reported/src/Demo.php
+@@ -21 +21 @@
+-        (new ServiceB())->run($config);
++        (new ServiceB())->run($config);

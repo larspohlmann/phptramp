@@ -102,8 +102,10 @@ Enforced mechanically by `composer check` (and the PR mutation gate):
 - **Strict fixture-first TDD, one task per commit.** Write the failing test,
   confirm it fails for the expected reason, write the minimal code, go green,
   run `composer check`, commit. Never batch tasks into one commit.
-- **Conventional commits** (`feat:`, `fix:`, `test:`, `refactor:`, `docs:`,
-  `ci:`); the body explains *why* when it is not obvious.
+- **Conventional commits, issue number in the type**: `feat(#123): title`
+  (also `fix`, `test`, `refactor`, `docs`, `ci`). Use the plain `type: title`
+  form only when the work has no associated issue. The body explains *why* when
+  it is not obvious.
 - **Semantics are frozen in [docs/plan.md](docs/plan.md).** If a case is not
   covered there, pick the conservative option (fewer findings), add a fixture
   documenting the choice, and flag it in the commit message — never improvise
@@ -113,10 +115,11 @@ Enforced mechanically by `composer check` (and the PR mutation gate):
 
 ## Workflow
 
-- **git-flow.** Feature branches off `develop`; PRs merge into `develop`, never
-  `main`. Every merge to `develop` is shippable. `main` only ever moves through a
-  release. The AVH git-flow config is committed (`git flow feature start …`,
-  `git flow release start …`).
+- **git-flow (AVH).** Feature branches off `develop`; PRs merge into `develop`,
+  never `main`. Every merge to `develop` is shippable. `main` only ever moves
+  through a release. Config lives in `.git/config` (per clone) — run
+  `git flow init -d` once after cloning, with version-tag prefix `v`; then use
+  `git flow feature start …` and `git flow release start …`.
 - **Branch names embed the GitHub issue number**: `feature/2-chain-stitching`,
   `fix/17-untyped-receiver`.
 - `develop` is the repository's **default branch**, so a PR whose body says

@@ -1,0 +1,23 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\Controller::handle",
+            "terminal": "Demo\\Mailer::__construct",
+            "terminalKind": "stored",
+            "hops": 3,
+            "classes": 4,
+            "chain": [
+                {"method": "Demo\\Controller::handle", "role": "origin", "file": "src/Demo.php", "line": 11, "forwardLine": 13, "changed": false},
+                {"method": "Demo\\ServiceA::process", "role": "hop", "file": "src/Demo.php", "line": 19, "forwardLine": 21, "changed": true},
+                {"method": "Demo\\ServiceB::run", "role": "hop", "file": "src/Demo.php", "line": 27, "forwardLine": 29, "changed": false},
+                {"method": "Demo\\Mailer::__construct", "role": "terminal", "file": "src/Demo.php", "line": 37, "forwardLine": null, "changed": false}
+            ],
+            "notes": []
+        }
+    ]
+}

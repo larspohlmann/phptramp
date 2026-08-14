@@ -1,0 +1,22 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\SpecificHandler::__construct",
+            "terminal": "Demo\\Mailer::send",
+            "terminalKind": "stored",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\SpecificHandler::__construct", "role": "origin", "file": "src/Demo.php", "line": 19, "forwardLine": 21, "viaParent": true},
+                {"method": "Demo\\BaseHandler::__construct", "role": "hop", "file": "src/Demo.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\Mailer::send", "role": "terminal", "file": "src/Demo.php", "line": 29, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

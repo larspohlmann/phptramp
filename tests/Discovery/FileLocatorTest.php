@@ -42,7 +42,7 @@ final class FileLocatorTest extends TestCase
      */
     private function locate(Options $options): array
     {
-        return (new FileLocator())->locate($options);
+        return (new FileLocator($this->root))->locate($options);
     }
 
     private function real(string $relative): string
@@ -111,5 +111,55 @@ final class FileLocatorTest extends TestCase
         file_put_contents($this->root . '/Upper.PHP', "<?php\n");
 
         self::assertContains($this->real('Upper.PHP'), $this->locate(new Options(folders: [$this->root])));
+    }
+
+    public function testExcludeGlobDropsNestedDiscoveredFile(): void
+    {
+        mkdir($this->root . '/vendor/pkg/src', 0777, true);
+        file_put_contents($this->root . '/vendor/pkg/src/X.php', "<?php\n");
+
+        $found = $this->locate(new Options(folders: [$this->root], exclude: ['vendor/*']));
+
+        self::assertNotContains($this->real('vendor/pkg/src/X.php'), $found);
+        self::assertContains($this->real('a.php'), $found);
+    }
+
+    public function testExcludeGlobDropsDiscoveredFileByBasenamePattern(): void
+    {
+        file_put_contents($this->root . '/sub/bThingTest.php', "<?php\n");
+
+        $found = $this->locate(new Options(folders: [$this->root], exclude: ['*Test.php']));
+
+        self::assertNotContains($this->real('sub/bThingTest.php'), $found);
+        self::assertContains($this->real('a.php'), $found);
+    }
+
+    public function testExcludeMatchesRawPathWhenFileIsOutsideWorkingDirectory(): void
+    {
+        $otherDirectory = sys_get_temp_dir() . '/phptramp-loc-other-' . uniqid('', true);
+        mkdir($otherDirectory);
+
+        try {
+            $found = (new FileLocator($otherDirectory))->locate(
+                new Options(folders: [$this->root], exclude: [$this->real('a.php')])
+            );
+
+            self::assertNotContains($this->real('a.php'), $found);
+            self::assertContains($this->real('sub/b.php'), $found);
+        } finally {
+            rmdir($otherDirectory);
+        }
+    }
+
+    public function testExplicitFileBeatsExclude(): void
+    {
+        $found = $this->locate(new Options(
+            folders: [$this->root],
+            files: [$this->root . '/a.php'],
+            exclude: ['a.php', '*.php'],
+        ));
+
+        self::assertContains($this->real('a.php'), $found);
+        self::assertNotContains($this->real('sub/b.php'), $found);
     }
 }

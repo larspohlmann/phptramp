@@ -4,99 +4,93 @@ declare(strict_types=1);
 
 namespace PhpTramp\Index;
 
-use PhpParser\Error;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitor\NameResolver;
-use PhpParser\NodeVisitor\ParentConnectingVisitor;
-use PhpParser\Parser;
-use PhpParser\ParserFactory;
+use PhpTramp\Cache\FileIndexCache;
 
 /**
- * Parses the located files into a whole-project {@see MethodIndex}. Parameter
- * usage classification is delegated to {@see UsageClassifier}.
+ * Orchestrates per-file indexing: each located file is parsed and classified
+ * by {@see FileIndexer} in isolation, then the per-file results are merged in
+ * input order into one whole-project {@see MethodIndex}. The merge preserves
+ * the prior single-visitor accumulation semantics — later files win on
+ * duplicate FQMN/FQCN keys, suppression parts are concatenated — so the
+ * resulting index is byte-identical to the pre-refactor output.
+ *
+ * When a {@see FileIndexCache} is injected, each file is served from the cache
+ * on a hit (skipping the parse) and written back on a miss. Cache transparency
+ * is total: the cache never changes the merged result, never throws, and a
+ * cached entry is invalidated by mtime/size so an edited file always re-parses.
  *
  * @phpstan-import-type PendingMethod from IndexingVisitor
  */
 final class Indexer
 {
+    public function __construct(
+        private readonly FileIndexer $fileIndexer = new FileIndexer(),
+        private readonly ?FileIndexCache $cache = null,
+    ) {
+    }
+
     /**
      * @param list<string> $files
      *
-     * @throws ParseException if any file cannot be read or parsed
+     * @throws ParseException if any file cannot be read or parsed (per-file messages joined)
      */
     public function index(array $files): MethodIndex
     {
-        $parser = (new ParserFactory())->createForNewestSupportedVersion();
-
-        $visitor = new IndexingVisitor();
-        $traverser = new NodeTraverser();
-        $traverser->addVisitor(new NameResolver());
-        $traverser->addVisitor(new ParentConnectingVisitor());
-        $traverser->addVisitor($visitor);
-
+        /** @var array<string, MethodInfo> $mergedMethods */
+        $mergedMethods = [];
+        /** @var array<string, ClassInfo> $mergedClasses */
+        $mergedClasses = [];
+        /** @var list<SuppressionParts> $suppressions */
+        $suppressions = [];
         $errors = [];
+
         foreach ($files as $file) {
-            $error = $this->indexFile($parser, $traverser, $visitor, $file);
-            if ($error !== null) {
-                $errors[] = $error;
+            try {
+                $fileIndex = $this->indexFile($file);
+            } catch (ParseException $e) {
+                $errors[] = $e->getMessage();
+                continue;
             }
+
+            foreach ($fileIndex->methods as $fqmn => $method) {
+                $mergedMethods[$fqmn] = $method;
+            }
+            foreach ($fileIndex->classes as $fqcn => $class) {
+                $mergedClasses[$fqcn] = $class;
+            }
+            $suppressions[] = $fileIndex->suppression;
         }
 
         if ($errors !== []) {
             throw new ParseException("parse errors:\n" . implode("\n", $errors));
         }
 
-        return new MethodIndex($this->classifyPending($visitor->pending()), $visitor->classes());
+        return new MethodIndex(
+            $mergedMethods,
+            $mergedClasses,
+            SuppressionParts::merge(...$suppressions)->toSuppressionIndex(),
+        );
     }
 
     /**
-     * @param list<PendingMethod> $pending
-     *
-     * @return array<string, MethodInfo>
+     * Returns the cached {@see FileIndex} on a hit, otherwise parses fresh
+     * and stores the result for next time. A null cache means uncached, which
+     * is the default so every existing `new Indexer()` call site is unaffected.
      */
-    private function classifyPending(array $pending): array
+    private function indexFile(string $file): FileIndex
     {
-        $classifier = new UsageClassifier();
-        $methods = [];
-        foreach ($pending as $entry) {
-            $node = $entry['node'];
-            $params = $classifier->classify($node->getParams(), $node->getStmts());
-            $methods[$entry['fqmn']] = new MethodInfo(
-                $entry['fqmn'],
-                $entry['file'],
-                $entry['line'],
-                $params,
-                $entry['class'],
-            );
+        if ($this->cache === null) {
+            return $this->fileIndexer->index($file);
         }
 
-        return $methods;
-    }
-
-    private function indexFile(
-        Parser $parser,
-        NodeTraverser $traverser,
-        IndexingVisitor $visitor,
-        string $file
-    ): ?string {
-        $code = @file_get_contents($file);
-        if ($code === false) {
-            return "{$file}: could not read file";
+        $cached = $this->cache->get($file);
+        if ($cached !== null) {
+            return $cached;
         }
 
-        try {
-            $ast = $parser->parse($code);
-        } catch (Error $e) {
-            return "{$file}: {$e->getMessage()}";
-        }
+        $fileIndex = $this->fileIndexer->index($file);
+        $this->cache->put($file, $fileIndex);
 
-        if ($ast === null) {
-            return "{$file}: could not parse file";
-        }
-
-        $visitor->setFile($file);
-        $traverser->traverse($ast);
-
-        return null;
+        return $fileIndex;
     }
 }

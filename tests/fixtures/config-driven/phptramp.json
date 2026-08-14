@@ -1,0 +1,6 @@
+{
+    "paths": ["src"],
+    "exclude": ["src/Excl*.php"],
+    "limit": 1,
+    "warnLimit": 0
+}

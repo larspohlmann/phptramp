@@ -1,0 +1,21 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 2,
+    "findings": [
+        {
+            "param": "previous",
+            "severity": "error",
+            "origin": "Demo\\Controller::handle",
+            "terminal": null,
+            "terminalKind": "external",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\Controller::handle", "role": "origin", "file": "src/Demo.php", "line": 15, "forwardLine": 17},
+                {"method": "Demo\\ThinException::__construct", "role": "hop", "file": "src/Demo.php", "line": 7, "forwardLine": 9, "viaParent": true}
+            ],
+            "notes": []
+        }
+    ]
+}

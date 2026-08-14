@@ -52,24 +52,26 @@ final class UsageClassifier
         $name = ($param->var instanceof Variable && is_string($param->var->name)) ? $param->var->name : '';
         $type = $this->typeToString($param->type);
         $forwards = [];
+        $storedOnly = false;
 
         if ($param->byRef) {
             $fate = ParamFate::ByRefTerminated;
         } elseif ($param->isPromoted()) {
             $fate = ParamFate::Used;
+            $storedOnly = true;
         } elseif ($stmts === null || $name === '') {
             $fate = ParamFate::Unused;
         } else {
-            [$fate, $forwards] = $this->analyzeBody($name, $param->variadic, $stmts);
+            [$fate, $forwards, $storedOnly] = $this->analyzeBody($name, $param->variadic, $stmts);
         }
 
-        return new ParamInfo($name, $position, $fate, $forwards, $param->byRef, $param->variadic, $type);
+        return new ParamInfo($name, $position, $fate, $forwards, $param->byRef, $param->variadic, $type, $storedOnly);
     }
 
     /**
      * @param array<Node\Stmt> $stmts
      *
-     * @return array{0: ParamFate, 1: list<ForwardSite>}
+     * @return array{0: ParamFate, 1: list<ForwardSite>, 2: bool}
      */
     private function analyzeBody(string $name, bool $variadic, array $stmts): array
     {
@@ -79,13 +81,13 @@ final class UsageClassifier
         $traverser->traverse($stmts);
 
         if ($collector->used) {
-            return [ParamFate::Used, $collector->forwards];
+            return [ParamFate::Used, $collector->forwards, $collector->storesOnly()];
         }
         if ($collector->forwards === []) {
-            return [ParamFate::Unused, []];
+            return [ParamFate::Unused, [], false];
         }
 
-        return [ParamFate::PureForward, $collector->forwards];
+        return [ParamFate::PureForward, $collector->forwards, false];
     }
 
     private function typeToString(?Node $type): ?string

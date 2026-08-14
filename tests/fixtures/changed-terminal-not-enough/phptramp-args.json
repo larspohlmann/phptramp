@@ -1,0 +1,1 @@
+["--limit", "1", "--warn-limit", "0", "--diff", "tests/fixtures/changed-terminal-not-enough/changes.diff"]

@@ -1,5 +1,5 @@
 {
-    "name": "larspohlmann/phptramp",
+    "name": "phptramp/phptramp",
     "description": "Static analyzer that detects tramp data: parameters passed through chains of PHP methods that never use them.",
     "license": "MIT",
     "type": "library",
@@ -51,6 +51,7 @@
             "@md",
             "@test"
         ],
+        "tramp": "@php bin/phptramp",
         "infection": "infection --threads=max",
         "infection:diff": "infection --git-diff-filter=AM --git-diff-base=origin/main --threads=max --ignore-msi-with-no-mutations"
     },

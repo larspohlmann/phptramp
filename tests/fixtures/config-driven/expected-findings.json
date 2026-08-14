@@ -1,0 +1,21 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "config",
+            "severity": "error",
+            "origin": "Demo\\IncludedOrigin::run",
+            "terminal": "Demo\\IncludedTerminal::consume",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\IncludedOrigin::run", "role": "origin", "file": "src/Included.php", "line": 11, "forwardLine": 13},
+                {"method": "Demo\\IncludedTerminal::consume", "role": "terminal", "file": "src/Included.php", "line": 19, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

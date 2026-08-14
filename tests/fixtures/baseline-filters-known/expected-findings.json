@@ -1,0 +1,22 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "payload",
+            "severity": "error",
+            "origin": "Demo\\Origin::run",
+            "terminal": "Demo\\Sink::consume",
+            "terminalKind": "used",
+            "hops": 2,
+            "classes": 3,
+            "chain": [
+                {"method": "Demo\\Origin::run", "role": "origin", "file": "src/Demo.php", "line": 37, "forwardLine": 39},
+                {"method": "Demo\\Mid::pass", "role": "hop", "file": "src/Demo.php", "line": 45, "forwardLine": 47},
+                {"method": "Demo\\Sink::consume", "role": "terminal", "file": "src/Demo.php", "line": 53, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

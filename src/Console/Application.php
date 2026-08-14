@@ -4,17 +4,48 @@ declare(strict_types=1);
 
 namespace PhpTramp\Console;
 
+use PhpTramp\Baseline\Baseline;
+use PhpTramp\Baseline\BaselineException;
+use PhpTramp\Baseline\BaselineFilter;
+use PhpTramp\Cache\FileIndexCache;
+use PhpTramp\Chain\ChainBuilder;
+use PhpTramp\Chain\Finding;
+use PhpTramp\Chain\TerminalKindFilter;
+use PhpTramp\Config\ConfigException;
+use PhpTramp\Config\ConfigLoader;
+use PhpTramp\Diff\ChangedChainFilter;
+use PhpTramp\Diff\DiffException;
+use PhpTramp\Diff\DiffParser;
+use PhpTramp\Diff\GitDiffRunner;
 use PhpTramp\Discovery\FileLocator;
+use PhpTramp\Ignore\SuppressionFilter;
 use PhpTramp\Index\ForwardSite;
 use PhpTramp\Index\Indexer;
 use PhpTramp\Index\MethodIndex;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Index\ParseException;
+use PhpTramp\Report\ColorPolicy;
+use PhpTramp\Report\ReporterFactory;
+use PhpTramp\Report\Severity;
+use PhpTramp\Report\Thresholds;
+use PhpTramp\Resolve\CallResolver;
+use PhpTramp\Resolve\ClassHierarchy;
 
+/**
+ * The CLI coordinator: parses argv, reads env/TTY (its exclusive jurisdiction),
+ * builds the index, runs the chain resolver, and dispatches findings to a
+ * reporter. Complexity concentrates here because it is the single seam where
+ * the outside world (argv, cwd, STDOUT/STDIN, NO_COLOR) meets the pure domain
+ * — splitting it would scatter env access, violating the rule that only
+ * Application touches stream_isatty/getenv. The ExcessiveClassComplexity rule
+ * is therefore deliberately suppressed here.
+ *
+ * @SuppressWarnings("ExcessiveClassComplexity")
+ */
 final class Application
 {
     public const NAME = 'phptramp';
-    public const VERSION = '0.1.0-dev';
+    public const VERSION = '0.1.0';
 
     /** @var resource */
     private $stdout;
@@ -22,14 +53,19 @@ final class Application
     /** @var resource */
     private $stderr;
 
+    /** @var resource */
+    private $stdin;
+
     /**
      * @param resource|null $stdout
      * @param resource|null $stderr
+     * @param resource|null $stdin
      */
-    public function __construct($stdout = null, $stderr = null)
+    public function __construct($stdout = null, $stderr = null, $stdin = null)
     {
         $this->stdout = $stdout ?? \STDOUT;
         $this->stderr = $stderr ?? \STDERR;
+        $this->stdin = $stdin ?? \STDIN;
     }
 
     /**
@@ -40,14 +76,14 @@ final class Application
         $args = array_slice($argv, 1);
 
         try {
-            $options = (new ArgvParser())->parse($args);
-        } catch (InvalidArgsException $e) {
+            $options = (new ArgvParser())->parse($args, $this->loadDefaults($args));
+        } catch (ConfigException | InvalidArgsException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
             return 2;
         }
 
-        if ($args === [] || $options->help) {
+        if ($options->help) {
             fwrite($this->stdout, self::helpText());
 
             return 0;
@@ -63,16 +99,279 @@ final class Application
             return $this->dumpIndex($options);
         }
 
-        fwrite($this->stderr, "phptramp: chain analysis is not implemented yet (Phase 1). See docs/plan.md.\n");
+        if ($this->nothingToAnalyze($options)) {
+            fwrite($this->stdout, self::helpText());
 
-        return 2;
+            return 0;
+        }
+
+        return $this->analyze($options);
+    }
+
+    /**
+     * A run with no folders and no files has nothing to work on. That happens
+     * for a bare `phptramp` with no config; when config supplies `paths` the
+     * folders are populated, so the same argument-less invocation analyzes.
+     */
+    private function nothingToAnalyze(Options $options): bool
+    {
+        return $options->folders === [] && $options->files === [];
+    }
+
+    /**
+     * Config seeds the parser's defaults, so it must be resolved before parsing
+     * — which means --no-config is detected from the raw args here, not from the
+     * parsed Options that do not exist yet.
+     *
+     * @param list<string> $args
+     */
+    private function loadDefaults(array $args): Options
+    {
+        if (in_array(ArgvParser::NO_CONFIG_FLAG, $args, true)) {
+            return new Options();
+        }
+
+        return (new ConfigLoader())->load($this->workingDirectory());
+    }
+
+    private function workingDirectory(): string
+    {
+        return getcwd() ?: '.';
+    }
+
+    /**
+     * NO_COLOR is honored only in auto mode (Q11 precedence): always/never
+     * are absolute. Any non-empty value disables color.
+     */
+    private function noColorSet(): bool
+    {
+        $value = getenv('NO_COLOR');
+
+        return $value !== false && $value !== '';
+    }
+
+    /**
+     * The default format is `pretty`, but piping into a file or another tool
+     * should produce clean text. Downgrade happens only when the user has not
+     * explicitly engaged with color (`--color=auto`, the implicit default):
+     * `--color=always` is the escape hatch to keep pretty through `less -R`,
+     * `--color=never` keeps plain pretty in a pipe. The original Options
+     * (user intent) is preserved everywhere else; only the reporter sees the
+     * downgraded copy.
+     */
+    private function downgradedOptions(Options $options): Options
+    {
+        $isImplicitPretty = $options->format === 'pretty' && $options->colorMode === 'auto';
+
+        if ($isImplicitPretty && ! stream_isatty($this->stdout)) {
+            return $options->withFormat('text');
+        }
+
+        return $options;
+    }
+
+    private function analyze(Options $options): int
+    {
+        try {
+            $thresholds = new Thresholds($options->limit, $options->warnLimit, $options->minClasses);
+            $terminalFilter = TerminalKindFilter::fromNames($options->excludeTerminals);
+            $baselineFilter = new BaselineFilter();
+            $baseline = $this->consumeBaseline($options, $baselineFilter);
+            $index = $this->buildIndex($options);
+            $reporter = (new ReporterFactory($this->workingDirectory()))->create(
+                $this->downgradedOptions($options),
+                ColorPolicy::from(
+                    $options->colorMode,
+                    stream_isatty($this->stdout),
+                    $this->noColorSet(),
+                ),
+            );
+            $suppression = (new SuppressionFilter($index->suppressions()))->filter(
+                $this->changedOnlyFindings($this->findChains($index), $options),
+            );
+            $findings = $terminalFilter->filter($suppression->kept);
+        } catch (InvalidArgsException | ParseException | DiffException | BaselineException $e) {
+            fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
+
+            return 2;
+        }
+
+        if ($options->generateBaseline !== null) {
+            return $this->generateBaseline($findings, $thresholds, $options->generateBaseline, $options->baseline);
+        }
+
+        $staleReporter = new StaleReporter($baseline, $index->suppressions());
+        $staleLines = $staleReporter->lines($options->changedOnly, $findings, $suppression->firedKeys);
+        foreach ($staleLines as $line) {
+            fwrite($this->stderr, $line . "\n");
+        }
+
+        $findings = $baselineFilter->exclude($findings, $baseline);
+
+        fwrite($this->stdout, $reporter->render($findings));
+
+        return $staleReporter->exitCode(
+            $this->hasError($findings, $thresholds),
+            $options->failOnStale,
+            $staleLines,
+        );
+    }
+
+    /**
+     * Consume mode loads only when --baseline is set without --generate-baseline
+     * (generation wins when both are set and already notes the ignored flag).
+     * Fail fast before the expensive index build.
+     */
+    private function consumeBaseline(Options $options, BaselineFilter $baselineFilter): ?Baseline
+    {
+        if ($options->baseline === null || $options->generateBaseline !== null) {
+            return null;
+        }
+
+        return $baselineFilter->load($options->baseline);
+    }
+
+    /**
+     * Generation is maintenance, not a gate: it reuses the filter chain up to
+     * the suppression step, collects the findings a reporter would show
+     * (errors and warnings — warnings excluded would resurface on every later
+     * run), and writes a baseline document. Exits 0 regardless of findings.
+     *
+     * @param list<Finding> $findings
+     */
+    private function generateBaseline(
+        array $findings,
+        Thresholds $thresholds,
+        string $baselinePath,
+        ?string $consumeBaseline,
+    ): int {
+        if ($consumeBaseline !== null) {
+            fwrite(
+                $this->stderr,
+                'phptramp: --baseline ignored while generating a new baseline' . "\n",
+            );
+        }
+
+        $reportedFindings = $this->reportedFindings($findings, $thresholds);
+        $written = @file_put_contents($baselinePath, Baseline::generate($reportedFindings));
+        if ($written === false) {
+            fwrite($this->stderr, 'phptramp: unable to write baseline to ' . $baselinePath . "\n");
+
+            return 2;
+        }
+
+        fwrite(
+            $this->stderr,
+            'baseline written: ' . $baselinePath
+            . ' (' . count($reportedFindings) . ' findings)' . "\n",
+        );
+
+        return 0;
+    }
+
+    /**
+     * The findings a reporter would show: severity is non-null (error or warning).
+     *
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function reportedFindings(array $findings, Thresholds $thresholds): array
+    {
+        $reported = [];
+        foreach ($findings as $finding) {
+            if ($thresholds->severityOf($finding) !== null) {
+                $reported[] = $finding;
+            }
+        }
+
+        return $reported;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     * @return list<Finding>
+     */
+    private function changedOnlyFindings(array $findings, Options $options): array
+    {
+        if (! $options->changedOnly) {
+            return $findings;
+        }
+
+        $changedLines = (new DiffParser())->parse($this->acquireDiffText($options))
+            ->resolveAgainst($this->workingDirectory());
+
+        return (new ChangedChainFilter($changedLines))->filter($findings);
+    }
+
+    private function acquireDiffText(Options $options): string
+    {
+        if ($options->diff === null) {
+            return (new GitDiffRunner())->run($options->gitBase, $this->workingDirectory());
+        }
+
+        if ($options->diff === '-') {
+            return $this->readStdin();
+        }
+
+        return $this->readDiffFile($options->diff);
+    }
+
+    private function readDiffFile(string $path): string
+    {
+        $contents = @file_get_contents($path);
+        if ($contents === false) {
+            throw new DiffException("unable to read diff file: {$path}");
+        }
+
+        return $contents;
+    }
+
+    private function readStdin(): string
+    {
+        $contents = stream_get_contents($this->stdin);
+        if ($contents === false) {
+            throw new DiffException('unable to read diff from stdin');
+        }
+
+        return $contents;
+    }
+
+    /**
+     * @param list<Finding> $findings
+     */
+    private function hasError(array $findings, Thresholds $thresholds): bool
+    {
+        foreach ($findings as $finding) {
+            if ($thresholds->severityOf($finding) === Severity::Error) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function buildIndex(Options $options): MethodIndex
+    {
+        $files = (new FileLocator($this->workingDirectory()))->locate($options);
+        $cache = $options->noCache ? null : new FileIndexCache($options->cacheDir);
+
+        return (new Indexer(cache: $cache))->index($files);
+    }
+
+    /**
+     * @return list<Finding>
+     */
+    private function findChains(MethodIndex $index): array
+    {
+        $resolver = new CallResolver($index, new ClassHierarchy($index));
+
+        return (new ChainBuilder($resolver))->build($index);
     }
 
     private function dumpIndex(Options $options): int
     {
         try {
-            $files = (new FileLocator())->locate($options);
-            $index = (new Indexer())->index($files);
+            $index = $this->buildIndex($options);
         } catch (InvalidArgsException | ParseException $e) {
             fwrite($this->stderr, 'phptramp: ' . $e->getMessage() . "\n");
 
@@ -117,6 +416,9 @@ final class Application
 
     private static function helpText(): string
     {
+        // The help text is an aligned heredoc whose --format option list and
+        // status footer are locked verbatim and unavoidably exceed 120 chars.
+        // phpcs:disable Generic.Files.LineLength.TooLong
         return <<<'TXT'
             phptramp - detect tramp data in PHP codebases
 
@@ -133,18 +435,29 @@ final class Application
               --files <a,b,c>           Comma-separated list of files
 
             Reporting:
-              --limit <n>               Fail on chains with >= n pass-through hops (default: 3)
-              --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops
-              --format <fmt>            text|json|github|checkstyle|sarif|summary (default: text)
+              --limit <n>               Fail on chains with >= n pass-through hops (default: 6)
+              --warn-limit <n>          Warn (do not fail CI) on chains with >= n hops (default: 4; 0 = off)
+              --min-classes <n>         Only report chains traversing >= n distinct classes (default: 0 = off)
+              --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
+              --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
               --explain                 Show why chains ended (call resolution trace)
+              --exclude-terminal <kind> Do not report chains ending in <kind> (repeatable; used|stored|&-terminated|unused-end|external|truncated)
 
             Diff-aware mode:
               --changed-only            Only report chains touching changed lines
               --git-base <ref>          Diff base for --changed-only (default: origin/main)
+              --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
 
             Baseline:
               --baseline <file>         Ignore findings recorded in the baseline file
               --generate-baseline <file>  Write current findings to a baseline file
+              --fail-on-stale           Exit 1 when stale baseline entries or stale suppressions are found
+
+            Cache:
+              --no-cache                Disable the per-file index cache (default: on at .phptramp.cache/)
+
+            Config:
+              --no-config               Ignore phptramp.json / phptramp.dist.json (drive everything from flags)
 
             Debugging:
               --dump-index              Print the classified method index as JSON and exit
@@ -158,9 +471,15 @@ final class Application
               1  at least one finding at or over --limit
               2  tool error (bad arguments, parse failure, ...)
 
-            Status: Phase 1 - classifier and --dump-index shipped; chain analysis
-            (default reporting) lands in Phase 2. See docs/plan.md.
+            Status: v0.1.0 — cross-file chain reporting (seven formats incl. pretty colored
+            terminal output), diff-aware mode (--changed-only / --git-base / --diff),
+            baselining (--generate-baseline / --baseline / --fail-on-stale),
+            #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
+            config, --warn-limit, --min-classes, --color, --exclude-terminal (/ the
+            `excludeTerminals` config key), and a per-file index cache (--no-cache /
+            the `cache` config key) are all shipped. See docs/plan.md.
 
             TXT;
+        // phpcs:enable Generic.Files.LineLength.TooLong
     }
 }

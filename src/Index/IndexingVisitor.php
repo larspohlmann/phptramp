@@ -13,6 +13,7 @@ use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Enum_;
 use PhpParser\Node\Stmt\Function_;
 use PhpParser\Node\Stmt\Interface_;
+use PhpParser\Node\Stmt\Trait_;
 use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\NodeVisitorAbstract;
 
@@ -25,7 +26,7 @@ use PhpParser\NodeVisitorAbstract;
  * Relies on NameResolver (FQ names) and ParentConnectingVisitor (the `parent`
  * attribute) running before it in the traverser.
  *
- * @phpstan-type ClassFacts array{parent: ?string, interfaces: list<string>, traits: list<string>}
+ * @phpstan-type ClassFacts array{kind: ClassKind, parent: ?string, interfaces: list<string>, traits: list<string>}
  * @phpstan-type PendingMethod array{fqmn: string, file: string, line: int, class: ?string, node: FunctionLike}
  */
 final class IndexingVisitor extends NodeVisitorAbstract
@@ -37,6 +38,11 @@ final class IndexingVisitor extends NodeVisitorAbstract
     private array $classes = [];
 
     private string $file = '';
+
+    public function __construct(
+        private readonly SuppressionCollector $suppressionCollector = new SuppressionCollector(),
+    ) {
+    }
 
     public function setFile(string $file): void
     {
@@ -66,6 +72,22 @@ final class IndexingVisitor extends NodeVisitorAbstract
         return $this->pending;
     }
 
+    public function recordIgnoreComments(string $code): void
+    {
+        $this->suppressionCollector->recordIgnoreComments($this->file, $code);
+    }
+
+    /**
+     * The raw suppression parts accumulated for the files seen so far, before
+     * they are aggregated into a {@see \PhpTramp\Ignore\SuppressionIndex}. The
+     * Indexer merges these across files and builds one index from the
+     * concatenation.
+     */
+    public function suppressionParts(): SuppressionParts
+    {
+        return $this->suppressionCollector->parts($this->pending);
+    }
+
     /**
      * @return array<string, ClassInfo>
      */
@@ -75,6 +97,7 @@ final class IndexingVisitor extends NodeVisitorAbstract
         foreach ($this->classes as $fqcn => $facts) {
             $out[$fqcn] = new ClassInfo(
                 $fqcn,
+                $facts['kind'],
                 $facts['parent'],
                 $facts['interfaces'],
                 $facts['traits'],
@@ -104,10 +127,24 @@ final class IndexingVisitor extends NodeVisitorAbstract
         }
 
         $this->classes[$fqcn] = [
+            'kind' => $this->kindOf($node),
             'parent' => $parent,
             'interfaces' => $interfaces,
             'traits' => [],
         ];
+
+        $this->suppressionCollector->recordClassAttributes($fqcn, $node->attrGroups);
+    }
+
+    private function kindOf(ClassLike $node): ClassKind
+    {
+        return match (true) {
+            $node instanceof Interface_ => ClassKind::Interface_,
+            $node instanceof Trait_ => ClassKind::Trait_,
+            $node instanceof Enum_ => ClassKind::Enum_,
+            $node instanceof Class_ && $node->isAbstract() => ClassKind::AbstractClass,
+            default => ClassKind::ConcreteClass,
+        };
     }
 
     private function recordTraitUse(TraitUse $node): void
@@ -129,13 +166,16 @@ final class IndexingVisitor extends NodeVisitorAbstract
             return;
         }
 
+        $fqmn = $fqcn . '::' . $node->name->toString();
         $this->pending[] = [
-            'fqmn' => $fqcn . '::' . $node->name->toString(),
+            'fqmn' => $fqmn,
             'file' => $this->file,
             'line' => $node->getStartLine(),
             'class' => $fqcn,
             'node' => $node,
         ];
+
+        $this->suppressionCollector->recordFunctionLikeAttributes($fqmn, $node);
     }
 
     private function recordFunction(Function_ $node): void
@@ -152,6 +192,8 @@ final class IndexingVisitor extends NodeVisitorAbstract
             'class' => null,
             'node' => $node,
         ];
+
+        $this->suppressionCollector->recordFunctionLikeAttributes($fqmn, $node);
     }
 
     private function enclosingClassName(Node $node): ?string
