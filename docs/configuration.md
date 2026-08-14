@@ -1,12 +1,12 @@
 # Configuration
 
-Everything the CLI flags control can also be set in a config file; flags win.
+Everything the CLI flags control can also be set in a config file.
 
 ## The config file
 
 phptramp reads `phptramp.json` (falling back to `phptramp.dist.json`) from the current
 working directory. CLI flags always take precedence over the config file. An unknown
-key, or a value of the wrong type, is a config error rather than a silently ignored typo.
+key, or a value of the wrong type, is a config error rather than a silently ignored typo. `--no-config` bypasses the config file entirely when you want to drive everything from flags.
 
 ```json
 {
@@ -41,7 +41,7 @@ per-save IDE invocations — cheap: the whole-project index (the part call
 resolution needs) rebuilds from cache instead of re-parsing every file.
 
 - **Disable** with `--no-cache`, or **move the directory** with the `cache`
-  config key (see [Configuration](#configuration)).
+  config key (see [Keys](#keys)).
 - **Identity-validated and version-keyed.** Each entry stores the source
   file's path, mtime, and size, plus the tool and payload-format versions. Any
   mismatch — an edited file, a bumped version, a corrupt or stale entry — is
@@ -50,6 +50,8 @@ resolution needs) rebuilds from cache instead of re-parsing every file.
 - **Safe to wipe.** Delete `.phptramp.cache/` any time; the next run simply
   re-parses and repopulates it. Add `/.phptramp.cache/` to your own
   `.gitignore` so the cache is not committed.
+
+The classifier and whole-project index remain inspectable via `--dump-index`.
 
 ## Performance
 

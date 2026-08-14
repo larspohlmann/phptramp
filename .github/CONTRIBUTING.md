@@ -49,7 +49,7 @@ composer check       # all four — must be green before every commit
 
 Pull requests additionally run **diff-scoped mutation testing** (Infection,
 MSI ≥ 80) — and it gates the merge. Run it locally before opening or
-updating a PR:
+updating a PR (needs a coverage driver: `pcov` or `xdebug`):
 
 ```bash
 git fetch origin main
