@@ -126,6 +126,29 @@ final class ChangedChainFilterTest extends TestCase
         self::assertNotSame($originalChain[0], $rebuilt->chain[0]);
     }
 
+    /**
+     * Hop::withChanged() must carry $viaParent through unchanged. Nothing else
+     * pins this: rebuildIfChanged() replaces every hop in the chain via
+     * withChanged(), so a dropped constructor argument there would silently
+     * erase the (parent) annotation under --changed-only with the rest of the
+     * suite green — and no Infection mutator flags a removed constructor arg.
+     */
+    public function testViaParentHopSurvivesRebuildWithFlagIntact(): void
+    {
+        $chain = [
+            new Hop('Demo\A::__construct', 'Demo\A', 'src/A.php', 5, 7, false, 'config', true),
+            new Hop('Demo\B::step', 'Demo\B', 'src/B.php', 9, 11),
+            new Hop('Demo\C::sink', 'Demo\C', 'src/C.php', 13, null),
+        ];
+        $finding = $this->findingWithChain($chain);
+        $filter = new ChangedChainFilter(new ChangedLines(['src/A.php' => [5]]));
+
+        $kept = $filter->filter([$finding]);
+
+        self::assertCount(1, $kept);
+        self::assertTrue($kept[0]->chain[0]->viaParent);
+    }
+
     public function testKeepsFindingsThatMatchAndDropsThoseThatDoNotAmongSeveral(): void
     {
         $keptFinding = $this->findingWithChain($this->threeHopChain());

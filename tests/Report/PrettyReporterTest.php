@@ -171,6 +171,154 @@ TXT;
         self::assertSame($expected, $reporter->render([$finding]));
     }
 
+    public function testParentDelegatingHopIsAnnotated(): void
+    {
+        // Same three-node chain as TextReporterTest::testParentDelegatingHopIsAnnotated,
+        // wrapped in the pretty format's file header/divider/summary shell.
+        $chain = [
+            new Hop('Demo\Sub::__construct', 'Demo\Sub', 'src/Demo.php', 19, 21, false, 'config', true),
+            new Hop('Demo\Base::__construct', 'Demo\Base', 'src/Demo.php', 11, 13, false, 'config'),
+            new Hop('Demo\Mailer::send', 'Demo\Mailer', 'src/Demo.php', 29, null, false, 'config'),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Sub::__construct',
+            'Demo\Mailer::send',
+            TerminalKind::Stored,
+            1,
+            $chain,
+            2,
+            [],
+            [],
+        );
+
+        $expected = <<<'TXT'
+src/Demo.php
+
+FINDING  $config: 1 pass-through hop across 2 classes
+  origin    Demo\Sub::__construct($config)   src/Demo.php:19→21  (parent)
+  hop 2     Demo\Base::__construct($config)  src/Demo.php:11→13
+  terminal  Demo\Mailer::send($config)       src/Demo.php:29  (stored)
+
+----------------------------------------------------------------
+
+1 finding (limit: 1 hop).
+
+TXT;
+
+        $reporter = new PrettyReporter(
+            new Thresholds(1, null),
+            new Paths('/nonexistent-root'),
+            false,
+            new NullStyler(),
+        );
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
+    /**
+     * With AnsiStyler injected, `(parent)` must route through `terminalKind()`
+     * (dim-green) — the same style already pinned for `(stored)` in
+     * testAnsiStylerRoutesYoursToAnnotationAndTerminalKindToTerminalKind. The
+     * NullStyler fixture above cannot distinguish this route from a plain
+     * `annotation()` route because both are no-ops there.
+     */
+    public function testAnsiStylerRoutesParentAnnotationToTerminalKind(): void
+    {
+        $chain = [
+            new Hop('Demo\Sub::__construct', 'Demo\Sub', 'src/Demo.php', 19, 21, false, 'config', true),
+            new Hop('Demo\Base::__construct', 'Demo\Base', 'src/Demo.php', 11, 13, false, 'config'),
+            new Hop('Demo\Mailer::send', 'Demo\Mailer', 'src/Demo.php', 29, null, false, 'config'),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Sub::__construct',
+            'Demo\Mailer::send',
+            TerminalKind::Stored,
+            1,
+            $chain,
+            2,
+            [],
+            [],
+        );
+
+        $expected = <<<TXT
+\e[1;34msrc/Demo.php\e[0m
+
+\e[1;31mFINDING\e[0m  \$\e[1mconfig\e[0m: 1 pass-through hop across 2 classes
+  \e[2morigin  \e[0m  Demo\Sub::__construct(\$\e[36mconfig\e[0m)   \e[2msrc/Demo.php:19→21\e[0m  \e[2;32m(parent)\e[0m
+  \e[2mhop 2   \e[0m  Demo\Base::__construct(\$\e[36mconfig\e[0m)  \e[2msrc/Demo.php:11→13\e[0m
+  \e[2mterminal\e[0m  Demo\Mailer::send(\$\e[36mconfig\e[0m)       \e[2msrc/Demo.php:29\e[0m  \e[2;32m(stored)\e[0m
+
+\e[2m----------------------------------------------------------------\e[0m
+
+\e[1m1 finding (limit: 1 hop).\e[0m
+
+TXT;
+
+        $reporter = new PrettyReporter(
+            new Thresholds(1, null),
+            new Paths('/nonexistent-root'),
+            false,
+            new AnsiStyler(),
+        );
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
+    /**
+     * A hop can be both `viaParent` and `changed` at once. `(parent)` and
+     * `*YOURS*` must render in that order, joined by a single space, each
+     * styled through its own Styler method — this is exactly why the
+     * leading-paren sniff moved out of hopLine() into annotation().
+     */
+    public function testParentDelegatingHopThatIsAlsoChangedRendersBothAnnotationsInOrder(): void
+    {
+        $chain = [
+            new Hop('Demo\Sub::__construct', 'Demo\Sub', 'src/Demo.php', 19, 21, true, 'config', true),
+            new Hop('Demo\Base::__construct', 'Demo\Base', 'src/Demo.php', 11, 13, false, 'config'),
+            new Hop('Demo\Mailer::send', 'Demo\Mailer', 'src/Demo.php', 29, null, false, 'config'),
+        ];
+        $finding = new Finding(
+            'config',
+            'Demo\Sub::__construct',
+            'Demo\Mailer::send',
+            TerminalKind::Stored,
+            1,
+            $chain,
+            2,
+            [],
+            [],
+        );
+
+        // Split out so the origin row (both annotations) stays under the line
+        // length limit; interpolated into the heredoc below.
+        $parentAndYours = "\e[2;32m(parent)\e[0m \e[1;35m*YOURS*\e[0m";
+
+        $expected = <<<TXT
+\e[1;34msrc/Demo.php\e[0m
+
+\e[1;31mFINDING\e[0m  \$\e[1mconfig\e[0m: 1 pass-through hop across 2 classes
+  \e[2morigin  \e[0m  Demo\Sub::__construct(\$\e[36mconfig\e[0m)   \e[2msrc/Demo.php:19→21\e[0m  {$parentAndYours}
+  \e[2mhop 2   \e[0m  Demo\Base::__construct(\$\e[36mconfig\e[0m)  \e[2msrc/Demo.php:11→13\e[0m
+  \e[2mterminal\e[0m  Demo\Mailer::send(\$\e[36mconfig\e[0m)       \e[2msrc/Demo.php:29\e[0m  \e[2;32m(stored)\e[0m
+
+\e[2m----------------------------------------------------------------\e[0m
+
+\e[1m1 finding (limit: 1 hop).\e[0m
+
+TXT;
+
+        $reporter = new PrettyReporter(
+            new Thresholds(1, null),
+            new Paths('/nonexistent-root'),
+            false,
+            new AnsiStyler(),
+        );
+
+        self::assertSame($expected, $reporter->render([$finding]));
+    }
+
     public function testGroupsByFileAlphabeticallyAndSortsWithinFileByFirstHopLine(): void
     {
         // Three findings, all hops=1, Thresholds(1, null) so all are reported as Error.

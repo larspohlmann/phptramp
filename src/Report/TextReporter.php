@@ -127,11 +127,16 @@ final class TextReporter implements Reporter
         if ($isTerminal) {
             return '(' . $terminalKind->value . ')';
         }
+
+        $parts = [];
+        if ($hop->viaParent) {
+            $parts[] = '(parent)';
+        }
         if ($hop->changed) {
-            return '*YOURS*';
+            $parts[] = '*YOURS*';
         }
 
-        return '';
+        return implode(' ', $parts);
     }
 
     private function label(int $index, bool $isTerminal): string
