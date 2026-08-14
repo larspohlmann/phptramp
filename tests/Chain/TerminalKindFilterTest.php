@@ -32,10 +32,16 @@ final class TerminalKindFilterTest extends TestCase
 
     public function testUnknownTerminalKindIsRejected(): void
     {
-        $this->expectException(InvalidArgsException::class);
-        $this->expectExceptionMessage('unknown terminal kind: constructed');
-
-        TerminalKindFilter::fromNames(['constructed']);
+        try {
+            TerminalKindFilter::fromNames(['constructed']);
+            self::fail('Expected InvalidArgsException was not thrown.');
+        } catch (InvalidArgsException $exception) {
+            self::assertSame(
+                'unknown terminal kind: constructed '
+                    . '(expected used|stored|&-terminated|unused-end|external|truncated)',
+                $exception->getMessage(),
+            );
+        }
     }
 
     private function finding(TerminalKind $kind): Finding
