@@ -756,6 +756,55 @@ final class ApplicationTest extends TestCase
         );
     }
 
+    /**
+     * The unknown kind is rejected before the index is built, so the folder's
+     * unparseable file never gets read. Both failures exit 2, so the stderr
+     * message is what distinguishes them: seeing the parse error here would
+     * mean validation had drifted behind buildIndex().
+     */
+    public function testUnknownExcludeTerminalKindExitsTwoBeforeTheIndexIsBuilt(): void
+    {
+        $folder = $this->fixtureWithUnparseableFile();
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--exclude-terminal', 'bogus',
+        ]);
+
+        self::assertSame(2, $exitCode);
+        self::assertStringContainsString(
+            'phptramp: unknown terminal kind: bogus (expected used|stored|&-terminated'
+                . '|unused-end|external|truncated)',
+            self::contents($this->stderr),
+        );
+    }
+
+    /**
+     * The counterpart to the suppression case above: excluding a terminal kind
+     * that a *baselined* chain ends in genuinely stops reporting that chain, so
+     * its baseline entry is stale. Accepted, not worked around — it only bites
+     * under --fail-on-stale, which flips the otherwise-clean run to exit 1.
+     */
+    public function testBaselinedChainWhoseTerminalKindBecomesExcludedGoesStale(): void
+    {
+        $folder = $this->fixtureWithOneHopChain();
+        $baselineFile = $folder . '/baseline.json';
+        self::assertSame(0, $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '1', '--warn-limit', '0',
+            '--generate-baseline', $baselineFile,
+        ]));
+
+        $exitCode = $this->app->run([
+            'phptramp', '--folder', $folder, '--no-config', '--limit', '1', '--warn-limit', '0',
+            '--baseline', $baselineFile, '--exclude-terminal', 'stored', '--fail-on-stale',
+        ]);
+
+        self::assertSame(1, $exitCode);
+        self::assertCount(
+            1,
+            $this->linesStartingWith(self::contents($this->stderr), 'phptramp: stale baseline entry:'),
+        );
+    }
+
     public function testChangedOnlySkipsStaleDetectionEntirely(): void
     {
         $folder = $this->fixtureWithChainAndUnusedIgnore();
@@ -1077,6 +1126,21 @@ final class ApplicationTest extends TestCase
             . 'class Controller { public function handle(Cfg $config): void { new Mailer($config); } } '
             . 'class Mailer { private Cfg $c; public function __construct(Cfg $config) { $this->c = $config; } }';
         file_put_contents($folder . '/Demo.php', $code);
+
+        return $folder;
+    }
+
+    /**
+     * A folder whose only file cannot be parsed, so any run that reaches
+     * buildIndex() fails with a ParseException.
+     */
+    private function fixtureWithUnparseableFile(): string
+    {
+        $folder = sys_get_temp_dir() . '/phptramp-app-' . uniqid();
+        mkdir($folder);
+        $this->folders[] = $folder;
+
+        file_put_contents($folder . '/Broken.php', '<?php class {{{');
 
         return $folder;
     }

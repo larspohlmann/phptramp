@@ -472,8 +472,9 @@ final class Application
             terminal output), diff-aware mode (--changed-only / --git-base / --diff),
             baselining (--generate-baseline / --baseline / --fail-on-stale),
             #[TrampIgnore] / // phptramp-ignore suppression, the phptramp.json
-            config, --warn-limit, --min-classes, --color, and a per-file index cache
-            (--no-cache / the `cache` config key) are all shipped. See docs/plan.md.
+            config, --warn-limit, --min-classes, --color, --exclude-terminal (/ the
+            `excludeTerminals` config key), and a per-file index cache (--no-cache /
+            the `cache` config key) are all shipped. See docs/plan.md.
 
             TXT;
         // phpcs:enable Generic.Files.LineLength.TooLong

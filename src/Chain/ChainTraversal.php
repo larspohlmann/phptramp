@@ -247,15 +247,24 @@ final class ChainTraversal
     }
 
     /**
+     * The class count: distinct declaring classes the value visited. A
+     * `parent::` delegator is skipped because the base it delegates into is the
+     * same object and stands in for it — but only when that base is actually in
+     * the chain. A chain ending at a delegator (its base is outside the index,
+     * e.g. `extends \RuntimeException`) has nothing downstream to represent it,
+     * so its class counts; the value really did cross into it.
+     *
      * @param list<Hop> $chain
      */
     private function distinctClasses(array $chain): int
     {
         $classes = [];
-        foreach ($chain as $hop) {
-            if ($hop->class !== null && ! $hop->viaParent) {
-                $classes[$hop->class] = true;
+        $lastIndex = count($chain) - 1;
+        foreach ($chain as $index => $hop) {
+            if ($hop->class === null || ($hop->viaParent && $index !== $lastIndex)) {
+                continue;
             }
+            $classes[$hop->class] = true;
         }
 
         return count($classes);

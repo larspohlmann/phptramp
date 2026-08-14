@@ -23,7 +23,7 @@ objects that ignore it* is the smell.
 The issue suggested `stored` terminals might not be findings by default. That
 is rejected. The tool's own README headline finding — `$config` forwarded
 through a controller and two services into `new Mailer($config)` — is a
-`stored` terminal, as are 6 of the 16 findings across `tests/fixtures/`. The
+`stored` terminal, as are 7 of the 21 findings across `tests/fixtures/`. The
 issue's noisy example (`begin` → `persistedLog` → `new RunLog`) is 2 hops
 across 2 classes; the README's legitimate one is 3 hops across 4 classes. Both
 are `stored`, so the terminal kind is not what separates them — hop count is.
@@ -45,9 +45,13 @@ fingerprint are all unchanged. Only scoring changes:
 
 - `Finding::$hops` counts chain nodes that are **not** `viaParent` (the
   terminal node is never counted, as today).
-- `Finding::$classes` counts distinct declaring classes, **skipping**
-  `viaParent` nodes — a delegating subclass is represented by the base it
-  delegates into, which is the same object.
+- `Finding::$classes` counts distinct declaring classes, **skipping** a
+  `viaParent` node when the base it delegates into is present in the chain —
+  that base is the same object and stands in for it. A `viaParent` node that
+  ends the chain (its base is outside the index, e.g. `extends
+  \RuntimeException`) has no such stand-in, so its class *is* counted: the
+  value genuinely crossed into that class, and dropping it would undercount a
+  real collaborator boundary and silently hide the chain from `--min-classes`.
 
 This amends frozen rule 4 in `docs/plan.md`, which is the point of the issue
 ("this is about *what counts as a hop*, not the thresholds").
@@ -60,6 +64,7 @@ This amends frozen rule 4 in `docs/plan.md`, which is the point of the issue
 | `A` → `parent::` → `B` → `parent::` → `C` (stores) | 0 | 1 | never — see below |
 | `Sub::__construct` → `parent::` → `Base` → collaborator `D` (stores) | 1 | 2 | only at `--limit 1` |
 | collaborator `X` → `Sub::__construct` → `parent::` → `Base` (stores) | 1 | 2 | only at `--limit 1` |
+| collaborator `X` → `Sub::__construct` → `parent::` → outside the index | 1 | 2 | only at `--limit 1` |
 
 No reporter surfaces a 0-hop finding, but not for a single uniform reason:
 threshold-based reporters filter it out via `Thresholds::severityOf()`
@@ -182,6 +187,10 @@ Fixtures (`tests/fixtures/<case>/`, input codebase + expected output):
   forwards to a collaborator. Expects the collaborator hop counted and the
   parent hop discounted (`1 hop across 2 classes`), proving the discount is
   not a blanket suppression.
+- `parent-delegation-external-base` — a controller throwing a thin exception
+  that `extends \RuntimeException`. The delegating exception ends the chain, so
+  its class counts: run at `--min-classes 2`, expects the finding rather than
+  `[]`, pinning that a delegator with no in-chain base is not discounted away.
 - `exclude-terminal-stored` — two chains that both fire at the same limit and
   hop/class shape, one `stored`-terminated and one `used`-terminated, run with
   `--exclude-terminal stored`. Expects the one surviving `used` finding, not
@@ -201,8 +210,12 @@ Unit tests:
   unknown-kind test here either, for the same reason.
 - `ApplicationTest` — a suppressed, `stored`-terminated chain run with
   `--exclude-terminal stored --fail-on-stale` does not go stale, pinning that
-  the terminal filter runs after `SuppressionFilter`.
-- `ChainBuilderTest` — `viaParent` marking, hop and class discounting.
+  the terminal filter runs after `SuppressionFilter`; its counterpart, a
+  *baselined* `stored`-terminated chain, does go stale; and an unknown kind
+  exits 2 with the kind-name message even when the folder is unparseable,
+  pinning that validation runs before `buildIndex()`.
+- `ChainBuilderTest` — `viaParent` marking, hop and class discounting, and a
+  delegator into an out-of-index base still counting its class.
 - Reporter tests — `(parent)` annotation in text/pretty, `viaParent` in JSON.
 
 Existing fixtures must stay green: none of them use `parent::`, and the

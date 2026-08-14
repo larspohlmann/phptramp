@@ -267,6 +267,33 @@ final class ChainBuilderTest extends TestCase
         self::assertFalse($finding->chain[1]->viaParent);
     }
 
+    /**
+     * A delegator is discounted because the base it delegates into stands in
+     * for it — so when that base is outside the index (`extends
+     * \RuntimeException`), nothing downstream represents the delegator and its
+     * class must count. Otherwise the value visibly crosses Controller into
+     * ThinException while the header claims a single class.
+     */
+    public function testParentDelegationIntoAnExternalBaseStillCountsItsClass(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class ThinException extends \RuntimeException { '
+            . 'public function __construct(?\Throwable $previous) { parent::__construct(\'boom\', 0, $previous); } } '
+            . 'class Controller { '
+            . 'public function handle(?\Throwable $previous): void { throw new ThinException($previous); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\Controller::handle', $finding->origin);
+        self::assertSame(TerminalKind::External, $finding->terminalKind);
+        self::assertSame(1, $finding->hops);
+        self::assertSame(2, $finding->classes);
+        self::assertCount(2, $finding->chain);
+        self::assertTrue($finding->chain[1]->viaParent);
+    }
+
     public function testCollaboratorHopAfterParentDelegationStillScores(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '

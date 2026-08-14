@@ -133,7 +133,7 @@ phptramp [options]
   --format <fmt>            text|pretty|json|github|checkstyle|sarif|summary (default: pretty on TTY, text otherwise)
   --color <mode>            always|auto|never (default: auto; honors NO_COLOR in auto mode)
   --explain                 Show why chains ended (call resolution trace)
-  --exclude-terminal <kind> Do not report chains ending in <kind> (repeatable; used|stored|&-terminated|unused-end|external|truncated)
+  --exclude-terminal <kind> Do not report chains ending in <kind> (repeatable; used|stored|&-terminated|unused-end|external|truncated -- quote '&-terminated', or the shell backgrounds the command)
   --changed-only            Only report chains touching changed lines
   --git-base <ref>          Diff base for --changed-only (default: origin/main)
   --diff <path|->           Read the diff from a file, or stdin with '-' (implies --changed-only)
