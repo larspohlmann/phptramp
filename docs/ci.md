@@ -104,7 +104,7 @@ the full-scan gate above fails immediately. Baselining fixes that: snapshot the
 current findings once, commit the file, and from then on CI only fails on *new*
 chains. The fingerprint is refactor-stable (origin + param + terminal token — never
 line numbers or intermediate hops), so a baseline survives renames and chain
-shortening without churning. See the README's [Baseline](../README.md#baseline)
+shortening without churning. See the [Baseline](./baseline.md)
 section for the adoption story; the recipes below are the CI half.
 
 ### Generate the baseline once
