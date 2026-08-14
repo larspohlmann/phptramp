@@ -103,15 +103,17 @@ final class SarifReporter implements Reporter
     }
 
     /**
-     * @return list<array<string, mixed>> one entry per subsequent hop (chain
-     *                                     indices 1 .. hops-1); the terminal
-     *                                     node is never included
+     * @return list<array<string, mixed>> one entry per forwarding node after the
+     *                                     origin; the terminal node is never
+     *                                     included
      */
     private function relatedLocations(Finding $finding): array
     {
         $locations = [];
-        for ($index = 1; $index < $finding->hops; $index++) {
-            $hop = $finding->chain[$index];
+        foreach ($finding->forwardingHops() as $index => $hop) {
+            if ($index === 0) {
+                continue;
+            }
             $locations[] = [
                 'physicalLocation' => [
                     'artifactLocation' => ['uri' => $this->paths->relativize($hop->file)],

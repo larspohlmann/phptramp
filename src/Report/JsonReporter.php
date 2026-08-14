@@ -80,12 +80,11 @@ final class JsonReporter implements Reporter
      */
     private function chainDocument(Finding $finding): array
     {
-        $hasTerminalNode = count($finding->chain) > $finding->hops;
+        $terminalIndex = $finding->hasTerminalNode() ? count($finding->chain) - 1 : null;
 
         $chain = [];
         foreach ($finding->chain as $index => $hop) {
-            $isTerminal = $hasTerminalNode && $index === $finding->hops;
-            $chain[] = $this->hopDocument($hop, $index, $isTerminal);
+            $chain[] = $this->hopDocument($hop, $index, $index === $terminalIndex);
         }
 
         return $chain;

@@ -120,13 +120,13 @@ final class GithubReporter implements Reporter
     }
 
     /**
-     * @return array<int, Hop> non-terminal-hop entries keyed by their chain
-     *                         index (0 .. hops-1) — the terminal node, at
-     *                         index hops, is never included
+     * @return array<int, Hop> the forwarding-node entries keyed by their chain
+     *                         index; the terminal node, when the chain has one,
+     *                         is never included
      */
     private function nonTerminalHops(Finding $finding): array
     {
-        return array_slice($finding->chain, 0, $finding->hops, true);
+        return $finding->forwardingHops();
     }
 
     /**
