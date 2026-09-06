@@ -89,15 +89,33 @@ implementation. Every bullet is a fixture.
    per run and is a genuine pass-through — and the same callee twice is not fan-out
    either. A branch *condition* (an `elseif` condition, a `match` arm's condition, a
    `switch` case expression included) is never an arm: a forward there shares the path
-   with every arm. The test is syntactic, so two shapes are decided by where a forward
-   sits rather than by what actually runs: `switch` fallthrough
-   (`case 1: a($p); case 2: b($p);` with no `break`) counts as exclusive arms and leaves
-   the method a hop, and an early-return dispatcher
-   (`if ($x) { return a($p); } return b($p);`) counts as fan-out because the second
-   forward sits in no arm. Both are deliberate simplifications of the shape test;
-   the early-return one is the conservative direction (the chain ends there, so fewer
-   findings), the fallthrough one leaves the pre-amendment classification in place.
-   `--exclude-terminal fan-out` targets the kind.
+   with every arm. A `parent::` forward counts as a callee like any other:
+   `parent::__construct($p); $this->init($p);` is fan-out. Rule 4's "same object"
+   exemption spares `parent::` from the hop and class counts only — it does not extend
+   to fan-out, and nothing is lost by ending the chain there, because the base-class
+   chain is reported from the base method as its own origin.
+
+   Callee identity is syntactic: a `CalleeRef`'s kind, name, and receiver hint. Two
+   consequences are on the record. `self::a($p); Foo::a($p);` inside `Foo` counts as two
+   callees even though both reach the same method (conservative — the chain ends there).
+   `$this->left->save($p); $this->right->save($p);` collapses into *one* callee, because
+   every property-fetch receiver hints `raw`: same-named methods on two collaborators
+   leave the method a hop, which is more findings than truth. That over-reporting is
+   bounded — the resolver cannot follow a `raw` receiver either, so it truncates at that
+   forward. Different method names on `raw` receivers do fan out.
+
+   The test is syntactic, so two shapes are decided by where a forward sits rather than
+   by what actually runs. Any early-return or guard-clause dispatcher counts as fan-out,
+   because no two of its forwards sit in different arms of the same branch:
+   `if ($x) { return a($p); } return b($p);`, the `instanceof` ladder
+   (`if ($x instanceof A) { return a($p); } if ($x instanceof B) { return b($p); }
+   throw …`), and `try { a($p); } catch (\Throwable) { b($p); }` alike. `switch`
+   fallthrough (`case 1: a($p); case 2: b($p);` with no `break`) goes the other way and
+   counts as exclusive arms. Both are deliberate simplifications of the shape test; the
+   early-return one is the conservative direction (the chain ends there, so fewer
+   findings), the fallthrough one leaves the pre-amendment classification in place — the
+   method keeps being a hop, so chains run on through it, which is more findings than
+   truth. `--exclude-terminal fan-out` targets the kind.
 2. **By-ref receipt terminates.** A parameter declared `&$p` is `ByRefTerminated`: the
    method may write to it, so it is never a mindless hop. Reported with an
    `&-terminated` note.
@@ -127,8 +145,9 @@ implementation. Every bullet is a fixture.
    (`function a(...$args) { b(...$args); }` is a hop).
 6. **Interfaces/abstract types:** follow the call **only when exactly one implementation
    exists in the analyzed code**; otherwise truncate with note
-   `"N implementations, chain truncated"`. Record the fan-out count (future
-   `--follow-all-implementations`).
+   `"N implementations, chain truncated"`. Record the fan-out count — the
+   implementation count, not the `fan-out` terminal of rule 1 — for a future
+   `--follow-all-implementations`.
 7. **Out of scope v0.1** (truncate with a note where detectable): closures / arrow
    functions, first-class callable syntax, `call_user_func*`, `__call`/`__callStatic`,
    dynamic method names, `func_get_args()`.
@@ -705,8 +724,8 @@ Tasks (expanded in `docs/plans/phase-2.md`):
      excludes lines by design).
   4. **Terminals:** child fate `Used` → terminal kind `used` (or `stored` when the
      body is a single property assignment); `ByRefTerminated` → `&-terminated`;
-     `Unused` → `unused-end` (dead forwarding — the value goes nowhere); leaf from
-     resolution → `external` or `truncated:<reason>`.
+     `Unused` → `unused-end` (dead forwarding — the value goes nowhere);
+     `FanOut` → `fan-out`; leaf from resolution → `external` or `truncated:<reason>`.
   5. **Hops** = count of `PureForward` nodes on the path (terminal never counted).
      `Finding{param, origin, terminal, terminalKind, hops, chain[], classes, notes}`;
      `classes` = distinct declaring classes across chain incl. terminal.
