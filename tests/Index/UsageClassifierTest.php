@@ -368,6 +368,30 @@ final class UsageClassifierTest extends TestCase
         self::assertCount(2, $p->forwards);
     }
 
+    public function testForwardInElseifConditionIsFanOutWithForwardInAnotherArm(): void
+    {
+        // An elseif condition is evaluated on the way into the else arm.
+        $p = $this->classify('if ($a) { } elseif (check($p)) { } else { fallback($p); }')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInMatchArmConditionIsFanOutWithForwardInAnotherArm(): void
+    {
+        // A match arm's condition is evaluated on the way into every later arm.
+        $p = $this->classify('match ($x) { probe($p) => 1, default => handle($p) };')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInSwitchCaseConditionIsFanOutWithForwardInAnotherCase(): void
+    {
+        // A case expression is evaluated on the way into every later case.
+        $p = $this->classify('switch ($x) { case a($p): break; default: b($p); }')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
     public function testTwoDistinctCalleesInsideOneArmAreFanOut(): void
     {
         $p = $this->classify('if ($x) { a($p); b($p); }')['p'];

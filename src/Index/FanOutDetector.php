@@ -13,12 +13,12 @@ namespace PhpTramp\Index;
  */
 final class FanOutDetector
 {
-    /** @var list<array{callee: CalleeRef, path: BranchArmPath}> */
+    /** @var list<ForwardOccurrence> */
     private array $forwards = [];
 
     public function record(CalleeRef $callee, BranchArmPath $path): void
     {
-        $this->forwards[] = ['callee' => $callee, 'path' => $path];
+        $this->forwards[] = new ForwardOccurrence($callee, $path);
     }
 
     /**
@@ -30,7 +30,7 @@ final class FanOutDetector
     {
         foreach ($this->forwards as $forward) {
             foreach ($this->forwards as $other) {
-                if ($this->combineDistinctCallees($forward, $other)) {
+                if (self::areDistinctOnOnePath($forward, $other)) {
                     return true;
                 }
             }
@@ -39,13 +39,9 @@ final class FanOutDetector
         return false;
     }
 
-    /**
-     * @param array{callee: CalleeRef, path: BranchArmPath} $one
-     * @param array{callee: CalleeRef, path: BranchArmPath} $other
-     */
-    private function combineDistinctCallees(array $one, array $other): bool
+    private static function areDistinctOnOnePath(ForwardOccurrence $one, ForwardOccurrence $other): bool
     {
-        return ! $one['callee']->isSameAs($other['callee'])
-            && ! $one['path']->isExclusiveWith($other['path']);
+        return ! $one->callee->isSameAs($other->callee)
+            && ! $one->branchArms->isExclusiveWith($other->branchArms);
     }
 }

@@ -16,8 +16,10 @@ use PHPUnit\Framework\TestCase;
 final class BranchArmPathTest extends TestCase
 {
     /**
-     * The FanOutDetector compares each pair of forwards in one direction only,
-     * so the symmetry of exclusivity has no classifier-level test.
+     * Pins the symmetry of `isExclusiveWith` directly: two nodes in different
+     * arms exclude each other whichever of them is asked. The classifier can
+     * only observe the relation through however FanOutDetector happens to
+     * iterate, so this contract needs a unit test of its own.
      */
     public function testExclusivityIsSymmetric(): void
     {

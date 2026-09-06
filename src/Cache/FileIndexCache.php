@@ -29,10 +29,12 @@ use PhpTramp\Index\SuppressionParts;
 final class FileIndexCache
 {
     /**
-     * Bump when {@see FileIndex} or any nested value object changes shape; a
+     * Bump when {@see FileIndex} or any nested value object changes shape, and
+     * whenever the classifier would give the same source a different answer —
+     * an entry is only ever allowed to be a miss, never a stale result. A
      * cached entry written under an older format is silently ignored.
      */
-    private const FORMAT = 2;
+    private const FORMAT = 3;
 
     /** Directory permission mode for lazily-created cache directories. */
     private const DIRECTORY_MODE = 0o755;
