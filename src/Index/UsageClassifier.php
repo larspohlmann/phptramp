@@ -14,7 +14,7 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitor\ParentConnectingVisitor;
 
 /**
- * Classifies each parameter of one method as PureForward, Used,
+ * Classifies each parameter of one method as PureForward, FanOut, Used,
  * ByRefTerminated, or Unused, following the frozen core semantics. The method
  * body must already have been name-resolved by the Indexer's main traversal.
  */
@@ -85,6 +85,10 @@ final class UsageClassifier
         }
         if ($collector->forwards === []) {
             return [ParamFate::Unused, [], false];
+        }
+
+        if ($collector->fansOut()) {
+            return [ParamFate::FanOut, $collector->forwards, false];
         }
 
         return [ParamFate::PureForward, $collector->forwards, false];

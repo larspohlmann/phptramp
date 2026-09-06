@@ -22,4 +22,11 @@ final class CalleeRef
         public readonly ?string $receiverHint = null,
     ) {
     }
+
+    public function isSameAs(self $other): bool
+    {
+        return $this->kind === $other->kind
+            && $this->name === $other->name
+            && $this->receiverHint === $other->receiverHint;
+    }
 }
