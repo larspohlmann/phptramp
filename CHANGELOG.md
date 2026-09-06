@@ -10,6 +10,15 @@ the git log and the merged pull requests.
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-09-06
+
+## What's Changed
+* fix(#25): treat a forward into a PHP internal function as a use by @larspohlmann in https://github.com/larspohlmann/phptramp/pull/27
+* feat(#26): report fan-out to distinct callees as a fan-out terminal by @larspohlmann in https://github.com/larspohlmann/phptramp/pull/28
+
+
+**Full Changelog**: https://github.com/larspohlmann/phptramp/compare/v0.1.0...v0.2.0
+
 ## [v0.1.0] - 2026-08-14
 
 Initial release.
