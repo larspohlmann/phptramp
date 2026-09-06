@@ -1,0 +1,49 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "key",
+            "severity": "error",
+            "origin": "Demo\\LineField::date",
+            "terminal": "Demo\\LineField::string",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 1,
+            "chain": [
+                {"method": "Demo\\LineField::date", "role": "origin", "file": "src/Demo.php", "line": 46, "forwardLine": 48},
+                {"method": "Demo\\LineField::string", "role": "terminal", "file": "src/Demo.php", "line": 26, "forwardLine": null}
+            ],
+            "notes": []
+        },
+        {
+            "param": "line",
+            "severity": "error",
+            "origin": "Demo\\LineField::date",
+            "terminal": "Demo\\LineField::string",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 1,
+            "chain": [
+                {"method": "Demo\\LineField::date", "role": "origin", "file": "src/Demo.php", "line": 46, "forwardLine": 48},
+                {"method": "Demo\\LineField::string", "role": "terminal", "file": "src/Demo.php", "line": 26, "forwardLine": null}
+            ],
+            "notes": []
+        },
+        {
+            "param": "decoded",
+            "severity": "error",
+            "origin": "Demo\\BackupReader::toDto",
+            "terminal": "Demo\\SubscriptionLine::fromLine",
+            "terminalKind": "fan-out",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\BackupReader::toDto", "role": "origin", "file": "src/Demo.php", "line": 54, "forwardLine": 57},
+                {"method": "Demo\\SubscriptionLine::fromLine", "role": "terminal", "file": "src/Demo.php", "line": 14, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

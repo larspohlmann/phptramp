@@ -38,7 +38,7 @@ final class TerminalKindFilterTest extends TestCase
         } catch (InvalidArgsException $exception) {
             self::assertSame(
                 'unknown terminal kind: constructed '
-                    . '(expected used|stored|&-terminated|unused-end|external|truncated)',
+                    . '(expected used|stored|fan-out|&-terminated|unused-end|external|truncated)',
                 $exception->getMessage(),
             );
         }

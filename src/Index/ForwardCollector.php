@@ -31,7 +31,9 @@ use PhpParser\NodeVisitorAbstract;
  * either a pure whole-argument forward or a real use. Subtrees that open a new
  * scope (closures, arrow functions, nested classes/functions) are not
  * descended into; instead the frozen closure/arrow-capture rules are applied
- * at the boundary. Requires the `parent` attribute to be set on visited nodes.
+ * at the boundary. Alongside the forwards it detects whether they fan out to
+ * distinct callees on one execution path. Requires the `parent` attribute to be
+ * set on visited nodes.
  */
 final class ForwardCollector extends NodeVisitorAbstract
 {
@@ -44,10 +46,19 @@ final class ForwardCollector extends NodeVisitorAbstract
 
     private bool $sawNonStore = false;
 
+    private readonly FanOutDetector $fanOutDetector;
+
     public function __construct(
         private readonly string $name,
         private readonly bool $variadic,
     ) {
+        $this->fanOutDetector = new FanOutDetector();
+    }
+
+    /** True when the forwards reach two or more distinct callees on one path. */
+    public function fansOut(): bool
+    {
+        return $this->fanOutDetector->fansOut();
     }
 
     /** True when every occurrence of the parameter is a `$this->prop = $p` store. */
@@ -112,6 +123,7 @@ final class ForwardCollector extends NodeVisitorAbstract
 
         $this->forwards[] = $forward;
         $this->sawNonStore = true;
+        $this->fanOutDetector->record($forward, BranchArmPath::of($node));
     }
 
     private function markUse(bool $isStore): void

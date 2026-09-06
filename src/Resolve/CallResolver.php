@@ -39,12 +39,34 @@ final class CallResolver
 
     private function resolveFunction(ForwardSite $site, MethodInfo $caller): Resolution
     {
-        $target = $this->functionTarget($site->callee->name, $this->namespaceOf($caller));
-        if ($target === null) {
-            return new ExternalTarget('function not in index');
+        $callerNamespace = $this->namespaceOf($caller);
+        $target = $this->functionTarget($site->callee->name, $callerNamespace);
+        if ($target !== null) {
+            return $this->bind($target, $site);
         }
 
-        return $this->bind($target, $site);
+        if ($this->isInternalFunction($site->callee->name, $callerNamespace)) {
+            return new InternalFunctionUse($site->callee->name);
+        }
+
+        return new ExternalTarget('function not in index');
+    }
+
+    /**
+     * A function absent from the index that PHP defines internally (`trim`,
+     * `parse_url`, …) consumes its argument — the value cannot travel further in
+     * user code. An absent function that is *not* internal (vendor code, a helper
+     * the index never saw) may still forward on, so it stays external.
+     */
+    private function isInternalFunction(string $name, string $callerNamespace): bool
+    {
+        foreach ($this->functionCandidates($name, $callerNamespace) as $candidate) {
+            if (function_exists($candidate) && (new \ReflectionFunction($candidate))->isInternal()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function functionTarget(string $name, string $callerNamespace): ?MethodInfo

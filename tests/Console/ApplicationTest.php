@@ -773,8 +773,8 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(2, $exitCode);
         self::assertStringContainsString(
-            'phptramp: unknown terminal kind: bogus (expected used|stored|&-terminated'
-                . '|unused-end|external|truncated)',
+            'phptramp: unknown terminal kind: bogus (expected used|stored|fan-out'
+                . '|&-terminated|unused-end|external|truncated)',
             self::contents($this->stderr),
         );
     }

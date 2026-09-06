@@ -12,6 +12,7 @@ use PhpTramp\Index\ParamFate;
 use PhpTramp\Index\ParamInfo;
 use PhpTramp\Resolve\CallResolver;
 use PhpTramp\Resolve\ExternalTarget;
+use PhpTramp\Resolve\InternalFunctionUse;
 use PhpTramp\Resolve\Resolution;
 use PhpTramp\Resolve\ResolvedTarget;
 use PhpTramp\Resolve\TruncatedResolution;
@@ -110,6 +111,11 @@ final class ChainTraversal
 
         foreach ($param->forwards as $forward) {
             $resolution = $this->resolver->resolve($forward, $method);
+            if ($resolution instanceof InternalFunctionUse) {
+                $this->recordInternalUse($method, $param, $forward, $resolution, $chain);
+                continue;
+            }
+
             $hop = new Hop(
                 $method->fqmn,
                 $method->class,
@@ -123,6 +129,27 @@ final class ChainTraversal
             $advanced = $chain->append($hop, $this->traceLine($method->fqmn, $forward, $resolution), $key);
             $this->follow($resolution, $advanced);
         }
+    }
+
+    /**
+     * A forward into a PHP internal function is a use: this method is the terminal,
+     * not a hop, so it never enters the hop-scored chain. An origin that only feeds
+     * the value to a built-in has no upstream hops and is not tramp data — it
+     * consumes its own parameter — so nothing is recorded.
+     */
+    private function recordInternalUse(
+        MethodInfo $method,
+        ParamInfo $param,
+        ForwardSite $forward,
+        Resolution $resolution,
+        PartialChain $chain,
+    ): void {
+        if ($chain->hops === []) {
+            return;
+        }
+
+        $traced = $chain->appendTrace($this->traceLine($method->fqmn, $forward, $resolution));
+        $this->record($traced, $this->terminalUse($method, $param));
     }
 
     /**
@@ -199,15 +226,12 @@ final class ChainTraversal
 
     private function terminalKind(ParamInfo $param): TerminalKind
     {
-        if ($param->fate === ParamFate::ByRefTerminated) {
-            return TerminalKind::ByRef;
-        }
-
-        if ($param->fate === ParamFate::Unused) {
-            return TerminalKind::Unused;
-        }
-
-        return $param->storedOnly ? TerminalKind::Stored : TerminalKind::Used;
+        return match ($param->fate) {
+            ParamFate::ByRefTerminated => TerminalKind::ByRef,
+            ParamFate::Unused => TerminalKind::Unused,
+            ParamFate::FanOut => TerminalKind::FanOut,
+            ParamFate::Used, ParamFate::PureForward => $param->storedOnly ? TerminalKind::Stored : TerminalKind::Used,
+        };
     }
 
     private function record(PartialChain $chain, Terminal $terminal): void

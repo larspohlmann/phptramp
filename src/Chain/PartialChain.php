@@ -34,6 +34,21 @@ final class PartialChain
         );
     }
 
+    /**
+     * A copy with one more resolution-trace line but no new hop — for an edge
+     * that ends the chain at the current node (an internal-function use) rather
+     * than advancing to a collaborator.
+     */
+    public function appendTrace(string $traceLine): self
+    {
+        return new self(
+            $this->originParam,
+            $this->hops,
+            [...$this->trace, $traceLine],
+            $this->keys,
+        );
+    }
+
     public function hasKey(string $key): bool
     {
         return in_array($key, $this->keys, true);

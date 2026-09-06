@@ -39,3 +39,12 @@ class Mailer
         $this->config = $config;
     }
 }
+
+class Auditor
+{
+    public function record(Cfg $config): void
+    {
+        (new ServiceA())->process($config);
+        (new ServiceB())->run($config);
+    }
+}

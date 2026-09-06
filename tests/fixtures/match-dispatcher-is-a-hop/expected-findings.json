@@ -1,0 +1,35 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "line",
+            "severity": "error",
+            "origin": "Demo\\Dispatcher::toDto",
+            "terminal": "Demo\\FooLine::fromLine",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\Dispatcher::toDto", "role": "origin", "file": "src/Demo.php", "line": 7, "forwardLine": 10},
+                {"method": "Demo\\FooLine::fromLine", "role": "terminal", "file": "src/Demo.php", "line": 22, "forwardLine": null}
+            ],
+            "notes": []
+        },
+        {
+            "param": "line",
+            "severity": "error",
+            "origin": "Demo\\Dispatcher::toDto",
+            "terminal": "Demo\\BarLine::fromLine",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\Dispatcher::toDto", "role": "origin", "file": "src/Demo.php", "line": 7, "forwardLine": 11},
+                {"method": "Demo\\BarLine::fromLine", "role": "terminal", "file": "src/Demo.php", "line": 34, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}

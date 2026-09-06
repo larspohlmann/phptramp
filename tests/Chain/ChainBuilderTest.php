@@ -76,10 +76,11 @@ final class ChainBuilderTest extends TestCase
         self::assertSame(TerminalKind::Used, $findings[0]->terminalKind);
     }
 
-    public function testBranchToTwoCalleesYieldsTwoFindings(): void
+    public function testForwardsInExclusiveBranchesYieldOneFindingPerBranch(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
-            . 'class A { public function go(Cfg $p): void { (new B())->left($p); (new C())->right($p); } } '
+            . 'class A { public function go(Cfg $p): void { '
+            . 'if (random_int(0, 1) === 1) { (new B())->left($p); } else { (new C())->right($p); } } } '
             . 'class B { public function left(Cfg $p): void { $p->x(); } } '
             . 'class C { public function right(Cfg $p): void { $p->y(); } }';
 
@@ -146,10 +147,44 @@ final class ChainBuilderTest extends TestCase
         self::assertSame(TerminalKind::Unused, $findings[0]->terminalKind);
     }
 
-    public function testForwardIntoExternalFunctionTerminatesAsExternal(): void
+    public function testFanOutCalleeTerminatesAsFanOut(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
-            . 'class A { public function go(Cfg $p): void { sprintf("%s", $p); } }';
+            . 'class A { public function go(Cfg $p): void { (new B())->consume($p); } } '
+            . 'class B { public function consume(Cfg $p): void { (new C())->x($p); (new D())->y($p); } } '
+            . 'class C { public function x(Cfg $p): void { $p->go(); } } '
+            . 'class D { public function y(Cfg $p): void { $p->go(); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\A::go', $finding->origin);
+        self::assertSame('Demo\B::consume', $finding->terminal);
+        self::assertSame(TerminalKind::FanOut, $finding->terminalKind);
+        self::assertSame(1, $finding->hops);
+        self::assertCount(2, $finding->chain);
+        self::assertSame('Demo\B::consume', $finding->chain[1]->fqmn);
+    }
+
+    /**
+     * A fan-out method consumes its own parameter, so a chain that would start
+     * there has no pass-through node at all and is not tramp data.
+     */
+    public function testOriginThatFansOutIsNotReported(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->x($p); (new C())->y($p); } } '
+            . 'class B { public function x(Cfg $p): void { $p->go(); } } '
+            . 'class C { public function y(Cfg $p): void { $p->go(); } }';
+
+        self::assertSame([], $this->build($code));
+    }
+
+    public function testForwardIntoUnknownUserFunctionTerminatesAsExternal(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { phptramp_unknown_helper($p); } }';
 
         $findings = $this->build($code);
         self::assertCount(1, $findings);
@@ -157,9 +192,86 @@ final class ChainBuilderTest extends TestCase
         self::assertNull($findings[0]->terminal);
         self::assertCount(1, $findings[0]->chain);
         self::assertSame(
-            ['Demo\A::go: function:sprintf -> external: function not in index'],
+            ['Demo\A::go: function:phptramp_unknown_helper -> external: function not in index'],
             $findings[0]->trace,
         );
+    }
+
+    public function testChainEndingInInternalFunctionIsAUsedTerminal(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class A { public function go(string $p): void { (new B())->normalize($p); } } '
+            . 'class B { public function normalize(string $p): string { return trim($p); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\A::go', $finding->origin);
+        self::assertSame('Demo\B::normalize', $finding->terminal);
+        self::assertSame(TerminalKind::Used, $finding->terminalKind);
+        self::assertSame(1, $finding->hops);
+        self::assertSame(2, $finding->classes);
+        self::assertCount(2, $finding->chain);
+        self::assertSame('Demo\B::normalize', $finding->chain[1]->fqmn);
+        self::assertNull($finding->chain[1]->forwardLine);
+        self::assertSame([
+            'Demo\A::go: method:normalize -> Demo\B::normalize',
+            'Demo\B::normalize: function:trim -> use: internal function trim()',
+        ], $finding->trace);
+    }
+
+    public function testLongChainEndingInInternalFunctionCountsOneFewerHop(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class A { public function go(string $p): void { (new B())->step($p); } } '
+            . 'class B { public function step(string $p): void { (new C())->finish($p); } } '
+            . 'class C { public function finish(string $p): string { return trim($p); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\C::finish', $finding->terminal);
+        self::assertSame(TerminalKind::Used, $finding->terminalKind);
+        self::assertSame(2, $finding->hops);
+        self::assertSame([
+            'Demo\A::go: method:step -> Demo\B::step',
+            'Demo\B::step: method:finish -> Demo\C::finish',
+            'Demo\C::finish: function:trim -> use: internal function trim()',
+        ], $finding->trace);
+    }
+
+    public function testInternalFunctionUseInOneArmDoesNotStopTheOtherArmsForward(): void
+    {
+        // B::relay stays a hop (its two forwards sit in exclusive arms), and one
+        // of them lands in an internal function. Recording that use terminates
+        // only its own branch: the walk must go on to the remaining forward.
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->relay($p); } } '
+            . 'class B { public function relay(Cfg $p): void { '
+            . 'if (random_int(0, 1) === 1) { count($p); } else { (new C())->y($p); } } } '
+            . 'class C { public function y(Cfg $p): void { $p->z(); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(2, $findings);
+
+        $terminals = [];
+        foreach ($findings as $finding) {
+            self::assertSame('Demo\A::go', $finding->origin);
+            self::assertSame(TerminalKind::Used, $finding->terminalKind);
+            $terminals[] = $finding->terminal;
+        }
+        sort($terminals);
+        self::assertSame(['Demo\B::relay', 'Demo\C::y'], $terminals);
+    }
+
+    public function testOriginForwardingOnlyToInternalFunctionIsNotReported(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class A { public function go(string $p): void { trim($p); } }';
+
+        self::assertSame([], $this->build($code));
     }
 
     public function testMultipleImplementationsTruncateWithNote(): void
