@@ -146,10 +146,10 @@ final class ChainBuilderTest extends TestCase
         self::assertSame(TerminalKind::Unused, $findings[0]->terminalKind);
     }
 
-    public function testForwardIntoExternalFunctionTerminatesAsExternal(): void
+    public function testForwardIntoUnknownUserFunctionTerminatesAsExternal(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
-            . 'class A { public function go(Cfg $p): void { sprintf("%s", $p); } }';
+            . 'class A { public function go(Cfg $p): void { phptramp_unknown_helper($p); } }';
 
         $findings = $this->build($code);
         self::assertCount(1, $findings);
@@ -157,9 +157,62 @@ final class ChainBuilderTest extends TestCase
         self::assertNull($findings[0]->terminal);
         self::assertCount(1, $findings[0]->chain);
         self::assertSame(
-            ['Demo\A::go: function:sprintf -> external: function not in index'],
+            ['Demo\A::go: function:phptramp_unknown_helper -> external: function not in index'],
             $findings[0]->trace,
         );
+    }
+
+    public function testChainEndingInInternalFunctionIsAUsedTerminal(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class A { public function go(string $p): void { (new B())->normalize($p); } } '
+            . 'class B { public function normalize(string $p): string { return trim($p); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\A::go', $finding->origin);
+        self::assertSame('Demo\B::normalize', $finding->terminal);
+        self::assertSame(TerminalKind::Used, $finding->terminalKind);
+        self::assertSame(1, $finding->hops);
+        self::assertSame(2, $finding->classes);
+        self::assertCount(2, $finding->chain);
+        self::assertSame('Demo\B::normalize', $finding->chain[1]->fqmn);
+        self::assertNull($finding->chain[1]->forwardLine);
+        self::assertSame([
+            'Demo\A::go: method:normalize -> Demo\B::normalize',
+            'Demo\B::normalize: function:trim -> use: internal function trim()',
+        ], $finding->trace);
+    }
+
+    public function testLongChainEndingInInternalFunctionCountsOneFewerHop(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class A { public function go(string $p): void { (new B())->step($p); } } '
+            . 'class B { public function step(string $p): void { (new C())->finish($p); } } '
+            . 'class C { public function finish(string $p): string { return trim($p); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\C::finish', $finding->terminal);
+        self::assertSame(TerminalKind::Used, $finding->terminalKind);
+        self::assertSame(2, $finding->hops);
+        self::assertSame([
+            'Demo\A::go: method:step -> Demo\B::step',
+            'Demo\B::step: method:finish -> Demo\C::finish',
+            'Demo\C::finish: function:trim -> use: internal function trim()',
+        ], $finding->trace);
+    }
+
+    public function testOriginForwardingOnlyToInternalFunctionIsNotReported(): void
+    {
+        $code = '<?php namespace Demo; '
+            . 'class A { public function go(string $p): void { trim($p); } }';
+
+        self::assertSame([], $this->build($code));
     }
 
     public function testMultipleImplementationsTruncateWithNote(): void
