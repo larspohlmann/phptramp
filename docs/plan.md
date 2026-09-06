@@ -96,8 +96,9 @@ implementation. Every bullet is a fixture.
    chain is reported from the base method as its own origin.
 
    Callee identity is syntactic: a `CalleeRef`'s kind, name, and receiver hint. Two
-   consequences are on the record. `self::a($p); Foo::a($p);` inside `Foo` counts as two
-   callees even though both reach the same method (conservative — the chain ends there).
+   consequences are on the record. `self::a($p); Foo::a($p);` inside `Foo`, like
+   `$this->go($p); $c->go($p);` with `$c` typed as the own class, counts as two callees
+   even though both reach the same method (conservative — the chain ends there).
    `$this->left->save($p); $this->right->save($p);` collapses into *one* callee, because
    every property-fetch receiver hints `raw`: same-named methods on two collaborators
    leave the method a hop, which is more findings than truth. That over-reporting is
@@ -145,9 +146,8 @@ implementation. Every bullet is a fixture.
    (`function a(...$args) { b(...$args); }` is a hop).
 6. **Interfaces/abstract types:** follow the call **only when exactly one implementation
    exists in the analyzed code**; otherwise truncate with note
-   `"N implementations, chain truncated"`. Record the fan-out count — the
-   implementation count, not the `fan-out` terminal of rule 1 — for a future
-   `--follow-all-implementations`.
+   `"N implementations, chain truncated"`. Record the implementation count (future
+   `--follow-all-implementations`).
 7. **Out of scope v0.1** (truncate with a note where detectable): closures / arrow
    functions, first-class callable syntax, `call_user_func*`, `__call`/`__callStatic`,
    dynamic method names, `func_get_args()`.
@@ -872,7 +872,7 @@ Explicit maybe-laters recorded during Phases 0–6; each waits on a concrete con
 ask unless the measurement already says "not yet".
 
 - **`--follow-all-implementations`:** follow all N implementations of an interface
-  instead of the single-implementation default — fan-out counts are already recorded
+  instead of the single-implementation default — implementation counts are already recorded
   since Phase 2 (see the single-implementation follow-through bullet in the Appendix),
   so this is a small flag, not a rewrite. Origin: Phase 2 frozen-semantics decision.
 - **Field/property tramping:** constructor-stored values re-forwarded via properties

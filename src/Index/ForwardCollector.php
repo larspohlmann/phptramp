@@ -123,7 +123,7 @@ final class ForwardCollector extends NodeVisitorAbstract
 
         $this->forwards[] = $forward;
         $this->sawNonStore = true;
-        $this->fanOutDetector->record($forward->callee, BranchArmPath::of($node));
+        $this->fanOutDetector->record($forward, BranchArmPath::of($node));
     }
 
     private function markUse(bool $isStore): void

@@ -87,11 +87,11 @@ final class UsageClassifier
             return [ParamFate::Unused, [], false];
         }
 
-        if ($collector->fansOut()) {
-            return [ParamFate::FanOut, $collector->forwards, false];
-        }
-
-        return [ParamFate::PureForward, $collector->forwards, false];
+        return [
+            $collector->fansOut() ? ParamFate::FanOut : ParamFate::PureForward,
+            $collector->forwards,
+            false,
+        ];
     }
 
     private function typeToString(?Node $type): ?string

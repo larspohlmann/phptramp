@@ -16,9 +16,9 @@ final class FanOutDetector
     /** @var list<ForwardOccurrence> */
     private array $forwards = [];
 
-    public function record(CalleeRef $callee, BranchArmPath $path): void
+    public function record(ForwardSite $site, BranchArmPath $branchArms): void
     {
-        $this->forwards[] = new ForwardOccurrence($callee, $path);
+        $this->forwards[] = new ForwardOccurrence($site, $branchArms);
     }
 
     /**
@@ -41,7 +41,7 @@ final class FanOutDetector
 
     private static function areDistinctOnOnePath(ForwardOccurrence $one, ForwardOccurrence $other): bool
     {
-        return ! $one->callee->isSameAs($other->callee)
+        return ! $one->site->callee->isSameAs($other->site->callee)
             && ! $one->branchArms->isExclusiveWith($other->branchArms);
     }
 }
