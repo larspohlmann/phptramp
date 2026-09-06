@@ -45,7 +45,7 @@ use PhpTramp\Resolve\ClassHierarchy;
 final class Application
 {
     public const NAME = 'phptramp';
-    public const VERSION = '0.2.0';
+    public const VERSION = '0.3.0-dev';
 
     /** @var resource */
     private $stdout;
