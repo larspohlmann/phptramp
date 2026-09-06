@@ -6,14 +6,15 @@ namespace PhpTramp\Chain;
 
 /**
  * How a tramp-data chain ends. The backing values are the tokens the reporters
- * print. `used`/`stored`/`&-terminated`/`unused-end` keep the terminal node in
- * the chain; `external`/`truncated` do not (the chain left analyzed code or was
- * conservatively cut short).
+ * print. `used`/`stored`/`fan-out`/`&-terminated`/`unused-end` keep the terminal
+ * node in the chain; `external`/`truncated` do not (the chain left analyzed code
+ * or was conservatively cut short).
  */
 enum TerminalKind: string
 {
     case Used = 'used';
     case Stored = 'stored';
+    case FanOut = 'fan-out';
     case ByRef = '&-terminated';
     case Unused = 'unused-end';
     case External = 'external';
@@ -29,7 +30,7 @@ enum TerminalKind: string
     public function keepsTerminalNode(): bool
     {
         return match ($this) {
-            self::Used, self::Stored, self::ByRef, self::Unused => true,
+            self::Used, self::Stored, self::FanOut, self::ByRef, self::Unused => true,
             self::External, self::Truncated => false,
         };
     }

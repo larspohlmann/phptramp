@@ -80,6 +80,24 @@ implementation. Every bullet is a fixture.
    method call on `$p`, array access, use in an expression, assignment to or from `$p`,
    `return $p`, capture in a closure — makes the method a **terminal use** and ends the
    chain there.
+
+   A method whose every occurrence of `$p` is a forward, but to two or more *distinct*
+   callees on one execution path, is a **fan-out terminal** (`fan-out`) rather than a
+   hop: it consumes the value by combining what those callees return (issue #26).
+   Forwards that reach distinct callees only in mutually exclusive arms (`if`/`elseif`/
+   `else`, `match`, `switch`, ternary) are not fan-out — a dispatcher picks one callee
+   per run and is a genuine pass-through — and the same callee twice is not fan-out
+   either. A branch *condition* (an `elseif` condition, a `match` arm's condition, a
+   `switch` case expression included) is never an arm: a forward there shares the path
+   with every arm. The test is syntactic, so two shapes are decided by where a forward
+   sits rather than by what actually runs: `switch` fallthrough
+   (`case 1: a($p); case 2: b($p);` with no `break`) counts as exclusive arms and leaves
+   the method a hop, and an early-return dispatcher
+   (`if ($x) { return a($p); } return b($p);`) counts as fan-out because the second
+   forward sits in no arm. Both are deliberate simplifications of the shape test;
+   the early-return one is the conservative direction (the chain ends there, so fewer
+   findings), the fallthrough one leaves the pre-amendment classification in place.
+   `--exclude-terminal fan-out` targets the kind.
 2. **By-ref receipt terminates.** A parameter declared `&$p` is `ByRefTerminated`: the
    method may write to it, so it is never a mindless hop. Reported with an
    `&-terminated` note.

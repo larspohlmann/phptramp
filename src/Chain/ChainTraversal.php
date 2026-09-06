@@ -234,6 +234,10 @@ final class ChainTraversal
             return TerminalKind::Unused;
         }
 
+        if ($param->fate === ParamFate::FanOut) {
+            return TerminalKind::FanOut;
+        }
+
         return $param->storedOnly ? TerminalKind::Stored : TerminalKind::Used;
     }
 

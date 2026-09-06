@@ -147,6 +147,40 @@ final class ChainBuilderTest extends TestCase
         self::assertSame(TerminalKind::Unused, $findings[0]->terminalKind);
     }
 
+    public function testFanOutCalleeTerminatesAsFanOut(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->consume($p); } } '
+            . 'class B { public function consume(Cfg $p): void { (new C())->x($p); (new D())->y($p); } } '
+            . 'class C { public function x(Cfg $p): void { $p->go(); } } '
+            . 'class D { public function y(Cfg $p): void { $p->go(); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(1, $findings);
+
+        $finding = $findings[0];
+        self::assertSame('Demo\A::go', $finding->origin);
+        self::assertSame('Demo\B::consume', $finding->terminal);
+        self::assertSame(TerminalKind::FanOut, $finding->terminalKind);
+        self::assertSame(1, $finding->hops);
+        self::assertCount(2, $finding->chain);
+        self::assertSame('Demo\B::consume', $finding->chain[1]->fqmn);
+    }
+
+    /**
+     * A fan-out method consumes its own parameter, so a chain that would start
+     * there has no pass-through node at all and is not tramp data.
+     */
+    public function testOriginThatFansOutIsNotReported(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->x($p); (new C())->y($p); } } '
+            . 'class B { public function x(Cfg $p): void { $p->go(); } } '
+            . 'class C { public function y(Cfg $p): void { $p->go(); } }';
+
+        self::assertSame([], $this->build($code));
+    }
+
     public function testForwardIntoUnknownUserFunctionTerminatesAsExternal(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '

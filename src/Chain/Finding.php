@@ -14,7 +14,7 @@ final class Finding
 {
     /**
      * @param list<Hop> $chain hops in order; includes the terminal node only when
-     *                         terminalKind is used|stored|&-terminated|unused-end
+     *                         terminalKind is used|stored|fan-out|&-terminated|unused-end
      * @param list<string> $notes human-readable, e.g. "truncated: 2 implementations"
      * @param list<string> $trace per-edge resolution trace, rendered only by --explain
      */
