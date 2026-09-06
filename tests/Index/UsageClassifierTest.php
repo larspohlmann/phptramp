@@ -339,6 +339,23 @@ final class UsageClassifierTest extends TestCase
         self::assertCount(2, $p->forwards);
     }
 
+    public function testParentCallBesideACallOnThisIsFanOut(): void
+    {
+        // Conservative: rule 4's "same object" exemption spares `parent::` from
+        // the hop count, it does not spare it from fan-out. The base-class chain
+        // is reported from the base method as its own origin, so nothing is lost.
+        $p = $this->classify('parent::__construct($p); $this->init($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testTwoDistinctParentCallsAreFanOut(): void
+    {
+        $p = $this->classify('parent::__construct($p); parent::init($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
     public function testSameMethodOnTwoReceiversIsFanOut(): void
     {
         $p = $this->classify('$x->save($p); $y->save($p);', 'Cfg $p, Repo $x, Repo $y')['p'];

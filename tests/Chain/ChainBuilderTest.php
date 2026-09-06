@@ -242,6 +242,30 @@ final class ChainBuilderTest extends TestCase
         ], $finding->trace);
     }
 
+    public function testInternalFunctionUseInOneArmDoesNotStopTheOtherArmsForward(): void
+    {
+        // B::relay stays a hop (its two forwards sit in exclusive arms), and one
+        // of them lands in an internal function. Recording that use terminates
+        // only its own branch: the walk must go on to the remaining forward.
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class A { public function go(Cfg $p): void { (new B())->relay($p); } } '
+            . 'class B { public function relay(Cfg $p): void { '
+            . 'if (random_int(0, 1) === 1) { count($p); } else { (new C())->y($p); } } } '
+            . 'class C { public function y(Cfg $p): void { $p->z(); } }';
+
+        $findings = $this->build($code);
+        self::assertCount(2, $findings);
+
+        $terminals = [];
+        foreach ($findings as $finding) {
+            self::assertSame('Demo\A::go', $finding->origin);
+            self::assertSame(TerminalKind::Used, $finding->terminalKind);
+            $terminals[] = $finding->terminal;
+        }
+        sort($terminals);
+        self::assertSame(['Demo\B::relay', 'Demo\C::y'], $terminals);
+    }
+
     public function testOriginForwardingOnlyToInternalFunctionIsNotReported(): void
     {
         $code = '<?php namespace Demo; '
