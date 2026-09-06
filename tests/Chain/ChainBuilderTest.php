@@ -76,10 +76,11 @@ final class ChainBuilderTest extends TestCase
         self::assertSame(TerminalKind::Used, $findings[0]->terminalKind);
     }
 
-    public function testBranchToTwoCalleesYieldsTwoFindings(): void
+    public function testForwardsInExclusiveBranchesYieldOneFindingPerBranch(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
-            . 'class A { public function go(Cfg $p): void { (new B())->left($p); (new C())->right($p); } } '
+            . 'class A { public function go(Cfg $p): void { '
+            . 'if (random_int(0, 1) === 1) { (new B())->left($p); } else { (new C())->right($p); } } } '
             . 'class B { public function left(Cfg $p): void { $p->x(); } } '
             . 'class C { public function right(Cfg $p): void { $p->y(); } }';
 
