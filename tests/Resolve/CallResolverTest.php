@@ -10,6 +10,7 @@ use PhpTramp\Index\MethodInfo;
 use PhpTramp\Resolve\CallResolver;
 use PhpTramp\Resolve\ClassHierarchy;
 use PhpTramp\Resolve\ExternalTarget;
+use PhpTramp\Resolve\InternalFunctionUse;
 use PhpTramp\Resolve\Resolution;
 use PhpTramp\Resolve\ResolvedTarget;
 use PhpTramp\Resolve\TruncatedResolution;
@@ -64,12 +65,30 @@ final class CallResolverTest extends TestCase
         self::assertSame('x', $resolution->boundParam);
     }
 
-    public function testUnknownFunctionIsExternal(): void
+    public function testUnknownUserFunctionIsExternal(): void
     {
         $code = '<?php namespace Demo; class Cfg {} '
-            . 'class Caller { public function go(Cfg $p): void { sprintf("%s", $p); } }';
+            . 'class Caller { public function go(Cfg $p): void { phptramp_unknown_helper($p); } }';
 
         self::assertInstanceOf(ExternalTarget::class, $this->resolve($code, 'Demo\Caller::go'));
+    }
+
+    public function testInternalFunctionIsAUse(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Caller { public function go(string $p): void { trim($p); } }';
+
+        $resolution = $this->resolve($code, 'Demo\Caller::go');
+        self::assertInstanceOf(InternalFunctionUse::class, $resolution);
+        self::assertSame('trim', $resolution->function);
+    }
+
+    public function testInternalFunctionReachedViaGlobalFallbackIsAUse(): void
+    {
+        $code = '<?php namespace Demo; class Cfg {} '
+            . 'class Caller { public function go(mixed $p): void { array_map($p, []); } }';
+
+        self::assertInstanceOf(InternalFunctionUse::class, $this->resolve($code, 'Demo\Caller::go'));
     }
 
     public function testStaticCallViaClassName(): void

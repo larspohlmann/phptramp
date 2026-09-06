@@ -1,0 +1,21 @@
+{
+    "limit": 1,
+    "warnLimit": null,
+    "minClasses": 0,
+    "findings": [
+        {
+            "param": "email",
+            "severity": "error",
+            "origin": "Demo\\Controller::handle",
+            "terminal": "Demo\\Normalizer::normalize",
+            "terminalKind": "used",
+            "hops": 1,
+            "classes": 2,
+            "chain": [
+                {"method": "Demo\\Controller::handle", "role": "origin", "file": "src/Demo.php", "line": 7, "forwardLine": 9},
+                {"method": "Demo\\Normalizer::normalize", "role": "terminal", "file": "src/Demo.php", "line": 15, "forwardLine": null}
+            ],
+            "notes": []
+        }
+    ]
+}
