@@ -106,9 +106,9 @@ final class UsageClassifierTest extends TestCase
         self::assertSame(1, $p->forwards[0]->argKey);
     }
 
-    public function testTwoForwardsRecordTwoSites(): void
+    public function testTwoForwardsToTheSameCalleeRecordTwoSites(): void
     {
-        $p = $this->classify('a($p); b($p);')['p'];
+        $p = $this->classify('a($p); a($p);')['p'];
         self::assertSame(ParamFate::PureForward, $p->fate);
         self::assertCount(2, $p->forwards);
     }
@@ -245,6 +245,11 @@ final class UsageClassifierTest extends TestCase
         self::assertFalse($this->classify('other($p);')['p']->storedOnly);
     }
 
+    public function testFanOutIsNotStoredOnly(): void
+    {
+        self::assertFalse($this->classify('a($p); b($p);')['p']->storedOnly);
+    }
+
     public function testPlainForwardingUseIsNotStoredOnly(): void
     {
         self::assertFalse($this->classify('log($p);')['p']->storedOnly);
@@ -318,5 +323,183 @@ final class UsageClassifierTest extends TestCase
         } finally {
             unlink($file);
         }
+    }
+
+    public function testTwoDistinctFunctionCalleesAreFanOut(): void
+    {
+        $p = $this->classify('a($p); b($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testTwoDistinctMethodsOnThisAreFanOut(): void
+    {
+        $p = $this->classify('$this->a($p); $this->b($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testParentCallBesideACallOnThisIsFanOut(): void
+    {
+        // Conservative: rule 4's "same object" exemption spares `parent::` from
+        // the hop count, it does not spare it from fan-out. The base-class chain
+        // is reported from the base method as its own origin, so nothing is lost.
+        $p = $this->classify('parent::__construct($p); $this->init($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testTwoDistinctParentCallsAreFanOut(): void
+    {
+        $p = $this->classify('parent::__construct($p); parent::init($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testSameMethodOnTwoReceiversIsFanOut(): void
+    {
+        $p = $this->classify('$x->save($p); $y->save($p);', 'Cfg $p, Repo $x, Repo $y')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testTwoDistinctInstantiationsAreFanOut(): void
+    {
+        $p = $this->classify('new A($p); new B($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testConditionalForwardBesideUnconditionalOneIsFanOut(): void
+    {
+        $p = $this->classify('if ($x) { a($p); } b($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInBranchConditionIsFanOutWithForwardInItsBody(): void
+    {
+        // The condition is not an arm: it runs before whichever arm is taken.
+        $p = $this->classify('if (a($p)) { b($p); }')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInElseifConditionIsFanOutWithForwardInAnotherArm(): void
+    {
+        // An elseif condition is evaluated on the way into the else arm.
+        $p = $this->classify('if ($a) { } elseif (check($p)) { } else { fallback($p); }')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInMatchArmConditionIsFanOutWithForwardInAnotherArm(): void
+    {
+        // A match arm's condition is evaluated on the way into every later arm.
+        $p = $this->classify('match ($x) { probe($p) => 1, default => handle($p) };')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInSwitchCaseConditionIsFanOutWithForwardInAnotherCase(): void
+    {
+        // A case expression is evaluated on the way into every later case.
+        $p = $this->classify('switch ($x) { case a($p): break; default: b($p); }')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testTwoDistinctCalleesInsideOneArmAreFanOut(): void
+    {
+        $p = $this->classify('if ($x) { a($p); b($p); }')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardAfterADispatcherIsFanOutWithEveryArm(): void
+    {
+        $p = $this->classify('match ($x) { 1 => a($p), default => b($p) }; c($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(3, $p->forwards);
+    }
+
+    public function testCoalesceOperandsAreFanOut(): void
+    {
+        // `??` short-circuits but does not branch: both operands are one path.
+        $p = $this->classify('$r = a($p) ?? b($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testForwardInsideLoopBesideForwardAfterItIsFanOut(): void
+    {
+        $p = $this->classify('foreach ($xs as $x) { a($p); } b($p);')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testVariadicSpreadToDistinctCalleesIsFanOut(): void
+    {
+        $p = $this->classify('a(...$p); b(...$p);', 'Cfg ...$p')['p'];
+        self::assertSame(ParamFate::FanOut, $p->fate);
+        self::assertCount(2, $p->forwards);
+    }
+
+    public function testSameCalleeWithOtherArgumentsDifferingIsPureForward(): void
+    {
+        self::assertSame(ParamFate::PureForward, $this->classify('a($p, 1); a($p, 2);')['p']->fate);
+    }
+
+    public function testForwardsInIfAndElseArmsArePureForward(): void
+    {
+        self::assertSame(
+            ParamFate::PureForward,
+            $this->classify('if ($x) { a($p); } else { b($p); }')['p']->fate,
+        );
+    }
+
+    public function testForwardsInIfElseifAndElseArmsArePureForward(): void
+    {
+        self::assertSame(
+            ParamFate::PureForward,
+            $this->classify('if ($x) { a($p); } elseif ($y) { b($p); } else { c($p); }')['p']->fate,
+        );
+    }
+
+    public function testForwardsInTwoDifferentElseifArmsArePureForward(): void
+    {
+        self::assertSame(
+            ParamFate::PureForward,
+            $this->classify('if ($x) { a($p); } elseif ($y) { b($p); } elseif ($z) { c($p); }')['p']->fate,
+        );
+    }
+
+    public function testForwardsInMatchArmsArePureForward(): void
+    {
+        self::assertSame(
+            ParamFate::PureForward,
+            $this->classify('match ($x) { 1 => a($p), default => b($p) };')['p']->fate,
+        );
+    }
+
+    public function testForwardsInSwitchCasesArePureForward(): void
+    {
+        self::assertSame(
+            ParamFate::PureForward,
+            $this->classify('switch ($x) { case 1: a($p); break; default: b($p); }')['p']->fate,
+        );
+    }
+
+    public function testForwardsInTernaryArmsArePureForward(): void
+    {
+        self::assertSame(ParamFate::PureForward, $this->classify('$r = $x ? a($p) : b($p);')['p']->fate);
+    }
+
+    public function testForwardsInNestedExclusiveArmsArePureForward(): void
+    {
+        self::assertSame(
+            ParamFate::PureForward,
+            $this->classify('if ($x) { if ($y) { a($p); } else { b($p); } } else { c($p); }')['p']->fate,
+        );
     }
 }

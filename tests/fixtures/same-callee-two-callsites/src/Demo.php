@@ -27,18 +27,13 @@ class Divergent
     public function forwardTwice(Cfg $config): void
     {
         Terminal::first($config);
-        Terminal::second($config);
+        Terminal::first($config);
     }
 }
 
 class Terminal
 {
     public static function first(Cfg $config): void
-    {
-        $config->go();
-    }
-
-    public static function second(Cfg $config): void
     {
         $config->go();
     }

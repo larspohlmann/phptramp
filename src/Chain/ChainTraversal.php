@@ -226,15 +226,12 @@ final class ChainTraversal
 
     private function terminalKind(ParamInfo $param): TerminalKind
     {
-        if ($param->fate === ParamFate::ByRefTerminated) {
-            return TerminalKind::ByRef;
-        }
-
-        if ($param->fate === ParamFate::Unused) {
-            return TerminalKind::Unused;
-        }
-
-        return $param->storedOnly ? TerminalKind::Stored : TerminalKind::Used;
+        return match ($param->fate) {
+            ParamFate::ByRefTerminated => TerminalKind::ByRef,
+            ParamFate::Unused => TerminalKind::Unused,
+            ParamFate::FanOut => TerminalKind::FanOut,
+            ParamFate::Used, ParamFate::PureForward => $param->storedOnly ? TerminalKind::Stored : TerminalKind::Used,
+        };
     }
 
     private function record(PartialChain $chain, Terminal $terminal): void

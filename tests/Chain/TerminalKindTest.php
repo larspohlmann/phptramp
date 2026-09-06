@@ -17,6 +17,7 @@ final class TerminalKindTest extends TestCase
     {
         yield 'used keeps its node' => [TerminalKind::Used, true];
         yield 'stored keeps its node' => [TerminalKind::Stored, true];
+        yield 'fan-out keeps its node' => [TerminalKind::FanOut, true];
         yield 'by-ref keeps its node' => [TerminalKind::ByRef, true];
         yield 'unused-end keeps its node' => [TerminalKind::Unused, true];
         yield 'external has no node' => [TerminalKind::External, false];

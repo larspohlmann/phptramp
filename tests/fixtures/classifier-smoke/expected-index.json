@@ -15,6 +15,10 @@
         "Demo\\Mailer::__construct": {
             "file": "src/Demo.php",
             "params": [{"name": "config", "fate": "Used", "forwards": []}]
+        },
+        "Demo\\Auditor::record": {
+            "file": "src/Demo.php",
+            "params": [{"name": "config", "fate": "FanOut", "forwards": ["method:process@0", "method:run@0"]}]
         }
     }
 }
